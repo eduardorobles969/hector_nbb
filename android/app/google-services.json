@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "417167835751",
+    "project_id": "hector-nbb",
+    "storage_bucket": "hector-nbb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:417167835751:android:6c7ae3eefda2baff04cac2",
+        "android_client_info": {
+          "package_name": "com.example.hector_nbb"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDXJvEcisUpl4SeoqChwN2mtDdRmA3OXr8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
