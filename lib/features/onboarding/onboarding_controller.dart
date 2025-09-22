@@ -137,6 +137,8 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         );
 
   final Ref _ref;
+  static const _completionMessage =
+      '¡Excelente! Dame un segundo para registrar todo y forjar tu plan personalizado.';
 
   List<OnboardingStep> get steps => _ref.read(onboardingStepsProvider);
   UserRepository get _repository => _ref.read(userRepositoryProvider);
@@ -202,6 +204,20 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     }
   }
 
+  List<OnboardingChatEntry> _immutableEntries(
+    Iterable<OnboardingChatEntry> entries,
+  ) {
+    return List<OnboardingChatEntry>.unmodifiable(entries);
+  }
+
+  Map<String, dynamic> _immutableAnswers(Map<String, dynamic> answers) {
+    return Map<String, dynamic>.unmodifiable(answers);
+  }
+
+  Set<String> _immutableSelection(Iterable<String> values) {
+    return Set<String>.unmodifiable(values);
+  }
+
   /// Avanza al siguiente paso del onboarding.
   void _advance() {
     if (!_hasSteps) {
@@ -248,7 +264,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           return;
         }
         state = current.copyWith(
-          entries: updatedEntries,
+          entries: _immutableEntries(updatedEntries),
           coachIsTyping: false,
         );
       });
@@ -259,14 +275,13 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       state = state.copyWith(
         completed: true,
         coachIsTyping: false,
-        entries: [
+        entries: _immutableEntries([
           ...state.entries,
           const OnboardingChatEntry(
-            text:
-                '¡Excelente! Dame un segundo para registrar todo y forjar tu plan personalizado.',
+            text: OnboardingController._completionMessage,
             fromCoach: true,
           ),
-        ],
+        ]),
       );
     }
   }
@@ -287,11 +302,11 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       return;
     }
     state = state.copyWith(
-      answers: Map.unmodifiable(answers),
-      entries: [
+      answers: _immutableAnswers(answers),
+      entries: _immutableEntries([
         ...state.entries,
         OnboardingChatEntry(text: displayText, fromCoach: false),
-      ],
+      ]),
     );
     _advance();
   }
@@ -319,11 +334,11 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       return;
     }
     state = state.copyWith(
-      answers: Map.unmodifiable(answers),
-      entries: [
+      answers: _immutableAnswers(answers),
+      entries: _immutableEntries([
         ...state.entries,
         OnboardingChatEntry(text: label, fromCoach: false),
-      ],
+      ]),
     );
     _advance();
   }
@@ -339,7 +354,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     if (!mounted) {
       return;
     }
-    state = state.copyWith(multiSelection: Set.unmodifiable(selection));
+    state = state.copyWith(multiSelection: _immutableSelection(selection));
   }
 
   /// Confirma la selección múltiple actual.
@@ -370,11 +385,11 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       return;
     }
     state = state.copyWith(
-      answers: Map.unmodifiable(answers),
-      entries: [
+      answers: _immutableAnswers(answers),
+      entries: _immutableEntries([
         ...state.entries,
         OnboardingChatEntry(text: labels, fromCoach: false),
-      ],
+      ]),
       multiSelection: const <String>{},
     );
     _advance();
@@ -397,11 +412,11 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       return;
     }
     state = state.copyWith(
-      answers: Map.unmodifiable(answers),
-      entries: [
+      answers: _immutableAnswers(answers),
+      entries: _immutableEntries([
         ...state.entries,
         OnboardingChatEntry(text: label, fromCoach: false),
-      ],
+      ]),
     );
     _advance();
   }
@@ -448,7 +463,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         answers: sanitizedAnswers,
       );
       if (!mounted) return;
-      state = state.copyWith(answers: Map.unmodifiable(sanitizedAnswers));
+      state = state.copyWith(answers: _immutableAnswers(sanitizedAnswers));
     } finally {
       if (mounted) {
         state = state.copyWith(isSaving: false);
@@ -461,15 +476,30 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     final targetIndex = steps.indexWhere((step) => step.id == stepId);
     if (targetIndex == -1) return;
 
-    final updatedEntries = List<OnboardingChatEntry>.from(state.entries);
-    if (state.completed && updatedEntries.isNotEmpty) {
+    final prompt = steps[targetIndex].prompt;
+    final updatedEntries = <OnboardingChatEntry>[];
+    var promptFound = false;
+    for (final entry in state.entries) {
+      if (!promptFound && entry.fromCoach && entry.text == prompt) {
+        promptFound = true;
+        break;
+      }
+      updatedEntries.add(entry);
+    }
+
+    if (state.completed &&
+        updatedEntries.isNotEmpty &&
+        updatedEntries.last.fromCoach &&
+        updatedEntries.last.text == _completionMessage) {
       updatedEntries.removeLast();
     }
+
     if (coachMessage != null) {
-      updatedEntries.add(OnboardingChatEntry(text: coachMessage, fromCoach: true));
+      updatedEntries
+          .add(OnboardingChatEntry(text: coachMessage, fromCoach: true));
     }
     updatedEntries
-        .add(OnboardingChatEntry(text: steps[targetIndex].prompt, fromCoach: true));
+        .add(OnboardingChatEntry(text: prompt, fromCoach: true));
 
     final updatedAnswers = Map<String, dynamic>.from(state.answers)
       ..removeWhere((key, _) {
@@ -481,8 +511,8 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       return;
     }
     state = state.copyWith(
-      entries: updatedEntries,
-      answers: Map.unmodifiable(updatedAnswers),
+      entries: _immutableEntries(updatedEntries),
+      answers: _immutableAnswers(updatedAnswers),
       stepIndex: targetIndex,
       completed: false,
       coachIsTyping: false,
