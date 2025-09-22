@@ -144,8 +144,27 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(onboardingControllerProvider);
     final controller = ref.read(onboardingControllerProvider.notifier);
+    final steps = controller.steps;
+    if (steps.isEmpty) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Center(
+            child: Text(
+              'Aún no hay pasos configurados para tu onboarding.',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     final step = controller.currentStep;
-    final totalSteps = controller.steps.length;
+    final totalSteps = steps.length;
 
     int visibleStep;
     if (state.completed) {

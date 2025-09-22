@@ -138,17 +138,31 @@ class OnboardingController extends Notifier<OnboardingState> {
   }
 
   OnboardingStep get currentStep {
-    if (steps.isEmpty) {
+    final step = _currentStepOrNull;
+    if (step == null) {
       throw StateError('No onboarding steps were configured.');
     }
-    return steps[_clampedStepIndex];
+    return step;
   }
 
+  bool get _hasSteps => steps.isNotEmpty;
+
   int get _clampedStepIndex {
-    if (steps.isEmpty) {
+    if (!_hasSteps) {
       return 0;
     }
     return state.stepIndex.clamp(0, steps.length - 1).toInt();
+  }
+
+  OnboardingStep? get _currentStepOrNull {
+    if (!_hasSteps) {
+      return null;
+    }
+    final index = _clampedStepIndex;
+    if (index < 0 || index >= steps.length) {
+      return null;
+    }
+    return steps[index];
   }
 
   String? _bridgeForStep(OnboardingStep step, Map<String, dynamic> answers) {
@@ -186,6 +200,16 @@ class OnboardingController extends Notifier<OnboardingState> {
 
   /// Avanza al siguiente paso del onboarding.
   void _advance() {
+    if (!_hasSteps) {
+      if (!state.completed) {
+        state = state.copyWith(
+          completed: true,
+          coachIsTyping: false,
+        );
+      }
+      return;
+    }
+
     final nextIndex = state.stepIndex + 1;
     if (nextIndex < steps.length) {
       final nextStep = steps[nextIndex];
@@ -232,13 +256,16 @@ class OnboardingController extends Notifier<OnboardingState> {
 
   /// Guarda una respuesta de texto y avanza.
   void submitText(String value) {
+    final step = _currentStepOrNull;
+    if (step == null) return;
+
     final trimmed = value.trim();
     if (trimmed.isEmpty) return;
     final answers = {
       ...state.answers,
-      currentStep.id: trimmed,
+      step.id: trimmed,
     };
-    final displayText = currentStep.id == 'password' ? '••••••' : trimmed;
+    final displayText = step.id == 'password' ? '••••••' : trimmed;
     state = state.copyWith(
       answers: Map.unmodifiable(answers),
       entries: [
@@ -251,17 +278,20 @@ class OnboardingController extends Notifier<OnboardingState> {
 
   /// Guarda una respuesta de opción única y avanza.
   void submitChoice(String choice) {
+    final step = _currentStepOrNull;
+    if (step == null) return;
+
     final answers = {
       ...state.answers,
-      currentStep.id: choice,
+      step.id: choice,
     };
 
     // Mostrar el label amigable si existe.
     String label = choice;
-    if (currentStep.choiceLabels != null) {
-      final idx = currentStep.choices.indexOf(choice);
-      if (idx >= 0 && idx < currentStep.choiceLabels!.length) {
-        label = currentStep.choiceLabels![idx];
+    if (step.choiceLabels != null) {
+      final idx = step.choices.indexOf(choice);
+      if (idx >= 0 && idx < step.choiceLabels!.length) {
+        label = step.choiceLabels![idx];
       }
     }
 
@@ -289,19 +319,21 @@ class OnboardingController extends Notifier<OnboardingState> {
   /// Confirma la selección múltiple actual.
   void confirmMulti() {
     if (state.multiSelection.isEmpty) return;
+    final step = _currentStepOrNull;
+    if (step == null) return;
 
     final answers = {
       ...state.answers,
-      currentStep.id: state.multiSelection.toList(),
+      step.id: state.multiSelection.toList(),
     };
 
     String labels = state.multiSelection.join(', ');
-    if (currentStep.choiceLabels != null) {
+    if (step.choiceLabels != null) {
       labels = state.multiSelection
           .map((value) {
-            final idx = currentStep.choices.indexOf(value);
-            if (idx >= 0 && idx < currentStep.choiceLabels!.length) {
-              return currentStep.choiceLabels![idx];
+            final idx = step.choices.indexOf(value);
+            if (idx >= 0 && idx < step.choiceLabels!.length) {
+              return step.choiceLabels![idx];
             }
             return value;
           })
@@ -321,12 +353,15 @@ class OnboardingController extends Notifier<OnboardingState> {
 
   /// Confirma una opción numérica seleccionada.
   void submitNumeric(String value) {
+    final step = _currentStepOrNull;
+    if (step == null) return;
+
     final answers = {
       ...state.answers,
-      currentStep.id: value,
+      step.id: value,
     };
-    final label = currentStep.unit != null
-        ? '$value ${currentStep.unit}'
+    final label = step.unit != null
+        ? '$value ${step.unit}'
         : value;
 
     state = state.copyWith(

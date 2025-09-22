@@ -112,20 +112,27 @@ class OnboardingState {
   }
 
   factory OnboardingState.initial(List<OnboardingStep> steps) {
-    return OnboardingState(
-      entries: [
-        const OnboardingChatEntry(
-          text:
-              '¡Hey! Soy Héctor, tu coach. Vamos a conversar para pulir un plan hecho a tu medida.',
-          fromCoach: true,
-        ),
+    final entries = <OnboardingChatEntry>[
+      const OnboardingChatEntry(
+        text:
+            '¡Hey! Soy Héctor, tu coach. Vamos a conversar para pulir un plan hecho a tu medida.',
+        fromCoach: true,
+      ),
+    ];
+
+    if (steps.isNotEmpty) {
+      entries.add(
         OnboardingChatEntry(text: steps.first.prompt, fromCoach: true),
-      ],
+      );
+    }
+
+    return OnboardingState(
+      entries: entries,
       stepIndex: 0,
       answers: <String, dynamic>{},
       multiSelection: <String>{},
       isSaving: false,
-      completed: false,
+      completed: steps.isEmpty,
       coachIsTyping: false,
     );
   }
