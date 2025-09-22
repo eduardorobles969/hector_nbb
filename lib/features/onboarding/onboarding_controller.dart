@@ -302,6 +302,10 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   void submitChoice(String choice) {
     final step = _currentStepOrNull;
     if (step == null) return;
+    if (step.type != OnboardingInputType.singleChoice ||
+        !step.choices.contains(choice)) {
+      return;
+    }
 
     final answers = {
       ...state.answers,
@@ -332,6 +336,15 @@ class OnboardingController extends StateNotifier<OnboardingState> {
 
   /// Alterna una selección múltiple.
   void toggleMulti(String value) {
+    final step = _currentStepOrNull;
+    if (step == null || step.type != OnboardingInputType.multiChoice) {
+      return;
+    }
+
+    if (!step.choices.contains(value)) {
+      return;
+    }
+
     final selection = {...state.multiSelection};
     if (selection.contains(value)) {
       selection.remove(value);
@@ -348,16 +361,23 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   void confirmMulti() {
     if (state.multiSelection.isEmpty) return;
     final step = _currentStepOrNull;
-    if (step == null) return;
+    if (step == null || step.type != OnboardingInputType.multiChoice) return;
+
+    final validValues = step.choices
+        .where((choice) => state.multiSelection.contains(choice))
+        .toList();
+    if (validValues.isEmpty) {
+      return;
+    }
 
     final answers = {
       ...state.answers,
-      step.id: state.multiSelection.toList(),
+      step.id: List.unmodifiable(validValues),
     };
 
-    String labels = state.multiSelection.join(', ');
+    String labels = validValues.join(', ');
     if (step.choiceLabels != null) {
-      labels = state.multiSelection
+      labels = validValues
           .map((value) {
             final idx = step.choices.indexOf(value);
             if (idx >= 0 && idx < step.choiceLabels!.length) {
@@ -386,6 +406,11 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   void submitNumeric(String value) {
     final step = _currentStepOrNull;
     if (step == null) return;
+
+    if (step.type != OnboardingInputType.numericChoice ||
+        !step.choices.contains(value)) {
+      return;
+    }
 
     final answers = {
       ...state.answers,
