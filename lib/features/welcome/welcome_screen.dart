@@ -1,10 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
-import '../auth/auth_providers.dart';
-import '../profile/profile_providers.dart';
 
 class WelcomeScreen extends ConsumerStatefulWidget {
   const WelcomeScreen({super.key});
@@ -14,67 +10,9 @@ class WelcomeScreen extends ConsumerStatefulWidget {
 }
 
 class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
-  bool _isProcessing = false;
-
-  Future<void> _startQuestionnaire() async {
-    if (_isProcessing) return;
-
-    setState(() => _isProcessing = true);
-    final messenger = ScaffoldMessenger.of(context);
-
-    try {
-      final auth = ref.read(firebaseAuthProvider);
-      final repository = ref.read(userRepositoryProvider);
-
-      User? user = auth.currentUser;
-      user ??= (await auth.signInAnonymously()).user;
-
-      if (user == null) {
-        throw FirebaseAuthException(
-          code: 'user-null',
-          message: 'No pudimos crear tu acceso temporal.',
-        );
-      }
-
-      await repository.ensureUserDocument(user);
-
-      if (!mounted) return;
-      context.go('/onboarding');
-    } on FirebaseAuthException catch (e) {
-      String message;
-      switch (e.code) {
-        case 'network-request-failed':
-          message =
-              'Sin conexion. Intenta de nuevo cuando vuelvas al fragor.';
-          break;
-        default:
-          message =
-              e.message ?? 'No pudimos iniciar el cuestionario. Intenta de nuevo.';
-      }
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.redAccent.shade200,
-          ),
-        );
-    } catch (_) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Algo salio mal. Intenta de nuevo para forjar tu destino.',
-            ),
-            backgroundColor: Colors.redAccent.shade200,
-          ),
-        );
-    } finally {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-      }
-    }
+  void _openAuth({required bool signUp}) {
+    final mode = signUp ? 'signup' : 'signin';
+    context.go('/auth?mode=$mode');
   }
 
   @override
@@ -92,17 +30,27 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Bienvenido a Never Be Broken',
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.8,
+                  RichText(
+                    text: TextSpan(
+                      text: 'Bienvenido a ',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                      ),
+                      children: const [
+                        TextSpan(
+                          text: 'Never Be Broken',
+                          style: TextStyle(
+                            color: Color(0xFFFF1744),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Entrena como los colosos. Elige si quieres comenzar la experiencia o ingresar con tu cuenta.',
+                    'Forja tu cuenta, responde el cuestionario inicial y te guiaremos paso a paso.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.white70,
                       height: 1.4,
@@ -121,11 +69,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                   ),
                   const SizedBox(height: 28),
                   OutlinedButton.icon(
-                    onPressed: _isProcessing
-                        ? null
-                        : () {
-                            context.go('/auth');
-                          },
+                    onPressed: () => _openAuth(signUp: false),
                     icon: const Icon(Icons.lock_open_rounded),
                     label: const Text('INICIAR SESIÓN'),
                     style: OutlinedButton.styleFrom(
@@ -140,20 +84,9 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                   ),
                   const SizedBox(height: 16),
                   FilledButton.icon(
-                    onPressed: _isProcessing ? null : _startQuestionnaire,
-                    icon: _isProcessing
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                              strokeWidth: 2.6,
-                            ),
-                          )
-                        : const Icon(Icons.bolt_rounded),
-                    label: Text(_isProcessing ? 'Preparando...' : 'EMPEZAR'),
+                    onPressed: () => _openAuth(signUp: true),
+                    icon: const Icon(Icons.bolt_rounded),
+                    label: const Text('EMPEZAR AHORA'),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFFF1744),
                       foregroundColor: Colors.white,
