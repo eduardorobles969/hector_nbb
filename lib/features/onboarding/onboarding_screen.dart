@@ -15,9 +15,38 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _textController = TextEditingController();
+  ProviderSubscription<OnboardingState>? _completionSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _completionSub = ref.listen<OnboardingState>(
+      onboardingControllerProvider,
+      (previous, next) {
+        final justCompleted =
+            next.completed && !next.isSaving && previous?.completed != true;
+        if (justCompleted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _handleCompletion();
+          });
+        }
+      },
+    );
+  }
+
+  Future<void> _handleCompletion() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final controller = ref.read(onboardingControllerProvider.notifier);
+    await controller.persist(user);
+    if (!mounted) return;
+    context.go('/profile');
+  }
 
   @override
   void dispose() {
+    _completionSub?.close();
     _textController.dispose();
     super.dispose();
   }
@@ -27,18 +56,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final state = ref.watch(onboardingControllerProvider);
     final controller = ref.read(onboardingControllerProvider.notifier);
     final step = controller.currentStep;
-
-    Future<void> finishIfNeeded() async {
-      if (!state.completed || state.isSaving) return;
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-      await controller.persist(user);
-      if (!mounted) return;
-      context.go('/profile');
-    }
-
-    // Ejecuta la verificación al construir.
-    finishIfNeeded();
 
     return Scaffold(
       backgroundColor: Colors.black,
