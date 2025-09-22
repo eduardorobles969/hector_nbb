@@ -27,11 +27,29 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     _stateSubscription = ref.listen<OnboardingState>(
       onboardingControllerProvider,
       (previous, next) {
+        final controller = ref.read(onboardingControllerProvider.notifier);
+        final steps = controller.steps;
         final justCompleted =
             next.completed && !next.isSaving && previous?.completed != true;
         final shouldScroll =
             (previous?.entries.length ?? 0) != next.entries.length ||
                 (previous?.coachIsTyping ?? false) != next.coachIsTyping;
+
+        if (!next.completed && previous?.stepIndex != next.stepIndex) {
+          final nextIndex = next.stepIndex;
+          if (nextIndex >= 0 && nextIndex < steps.length) {
+            final nextStep = steps[nextIndex];
+            if (nextStep.type != OnboardingInputType.freeText) {
+              if (_textController.text.isNotEmpty) {
+                _textController.clear();
+              }
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                FocusScope.of(context).unfocus();
+              });
+            }
+          }
+        }
 
         if (shouldScroll) {
           WidgetsBinding.instance
