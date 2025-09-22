@@ -137,7 +137,19 @@ class OnboardingController extends Notifier<OnboardingState> {
     return OnboardingState.initial(initialSteps);
   }
 
-  OnboardingStep get currentStep => steps[state.stepIndex];
+  OnboardingStep get currentStep {
+    if (steps.isEmpty) {
+      throw StateError('No onboarding steps were configured.');
+    }
+    return steps[_clampedStepIndex];
+  }
+
+  int get _clampedStepIndex {
+    if (steps.isEmpty) {
+      return 0;
+    }
+    return state.stepIndex.clamp(0, steps.length - 1).toInt();
+  }
 
   String? _bridgeForStep(OnboardingStep step, Map<String, dynamic> answers) {
     switch (step.id) {
@@ -180,7 +192,7 @@ class OnboardingController extends Notifier<OnboardingState> {
       state = state.copyWith(
         stepIndex: nextIndex,
         coachIsTyping: true,
-        multiSelection: <String>{},
+        multiSelection: const <String>{},
       );
 
       Future.delayed(const Duration(milliseconds: 520), () {
@@ -222,11 +234,13 @@ class OnboardingController extends Notifier<OnboardingState> {
   void submitText(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return;
-    final answers = Map<String, dynamic>.from(state.answers);
-    answers[currentStep.id] = trimmed;
+    final answers = {
+      ...state.answers,
+      currentStep.id: trimmed,
+    };
     final displayText = currentStep.id == 'password' ? '••••••' : trimmed;
     state = state.copyWith(
-      answers: answers,
+      answers: Map.unmodifiable(answers),
       entries: [
         ...state.entries,
         OnboardingChatEntry(text: displayText, fromCoach: false),
@@ -237,8 +251,10 @@ class OnboardingController extends Notifier<OnboardingState> {
 
   /// Guarda una respuesta de opción única y avanza.
   void submitChoice(String choice) {
-    final answers = Map<String, dynamic>.from(state.answers);
-    answers[currentStep.id] = choice;
+    final answers = {
+      ...state.answers,
+      currentStep.id: choice,
+    };
 
     // Mostrar el label amigable si existe.
     String label = choice;
@@ -250,7 +266,7 @@ class OnboardingController extends Notifier<OnboardingState> {
     }
 
     state = state.copyWith(
-      answers: answers,
+      answers: Map.unmodifiable(answers),
       entries: [
         ...state.entries,
         OnboardingChatEntry(text: label, fromCoach: false),
@@ -261,21 +277,23 @@ class OnboardingController extends Notifier<OnboardingState> {
 
   /// Alterna una selección múltiple.
   void toggleMulti(String value) {
-    final selection = Set<String>.from(state.multiSelection);
+    final selection = {...state.multiSelection};
     if (selection.contains(value)) {
       selection.remove(value);
     } else {
       selection.add(value);
     }
-    state = state.copyWith(multiSelection: selection);
+    state = state.copyWith(multiSelection: Set.unmodifiable(selection));
   }
 
   /// Confirma la selección múltiple actual.
   void confirmMulti() {
     if (state.multiSelection.isEmpty) return;
 
-    final answers = Map<String, dynamic>.from(state.answers);
-    answers[currentStep.id] = state.multiSelection.toList();
+    final answers = {
+      ...state.answers,
+      currentStep.id: state.multiSelection.toList(),
+    };
 
     String labels = state.multiSelection.join(', ');
     if (currentStep.choiceLabels != null) {
@@ -291,26 +309,28 @@ class OnboardingController extends Notifier<OnboardingState> {
     }
 
     state = state.copyWith(
-      answers: answers,
+      answers: Map.unmodifiable(answers),
       entries: [
         ...state.entries,
         OnboardingChatEntry(text: labels, fromCoach: false),
       ],
-      multiSelection: <String>{},
+      multiSelection: const <String>{},
     );
     _advance();
   }
 
   /// Confirma una opción numérica seleccionada.
   void submitNumeric(String value) {
-    final answers = Map<String, dynamic>.from(state.answers);
+    final answers = {
+      ...state.answers,
+      currentStep.id: value,
+    };
     final label = currentStep.unit != null
         ? '$value ${currentStep.unit}'
         : value;
-    answers[currentStep.id] = value;
 
     state = state.copyWith(
-      answers: answers,
+      answers: Map.unmodifiable(answers),
       entries: [
         ...state.entries,
         OnboardingChatEntry(text: label, fromCoach: false),
@@ -360,7 +380,7 @@ class OnboardingController extends Notifier<OnboardingState> {
         workingUser.uid,
         answers: sanitizedAnswers,
       );
-      state = state.copyWith(answers: sanitizedAnswers);
+      state = state.copyWith(answers: Map.unmodifiable(sanitizedAnswers));
     } finally {
       state = state.copyWith(isSaving: false);
     }
@@ -389,11 +409,11 @@ class OnboardingController extends Notifier<OnboardingState> {
 
     state = state.copyWith(
       entries: updatedEntries,
-      answers: updatedAnswers,
+      answers: Map.unmodifiable(updatedAnswers),
       stepIndex: targetIndex,
       completed: false,
       coachIsTyping: false,
-      multiSelection: <String>{},
+      multiSelection: const <String>{},
     );
   }
 }
