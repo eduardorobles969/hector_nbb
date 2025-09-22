@@ -35,7 +35,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/welcome', builder: (_, __) => const WelcomeScreen()),
-      GoRoute(path: '/auth', builder: (_, __) => const AuthScreen()),
+      GoRoute(
+        path: '/auth',
+        builder: (_, state) {
+          final mode = state.uri.queryParameters['mode'];
+          final initialMode =
+              mode == 'signup' ? AuthScreenMode.signUp : AuthScreenMode.signIn;
+          return AuthScreen(initialMode: initialMode);
+        },
+      ),
       GoRoute(
         path: '/onboarding',
         builder: (_, __) => const OnboardingScreen(),

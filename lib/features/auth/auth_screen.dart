@@ -9,14 +9,19 @@ import 'auth_providers.dart';
 import '../../data/models/user_role.dart';
 import '../profile/profile_providers.dart';
 
+enum AuthScreenMode { signIn, signUp }
+
 class AuthScreen extends ConsumerStatefulWidget {
-  const AuthScreen({super.key});
+  const AuthScreen({
+    super.key,
+    this.initialMode = AuthScreenMode.signIn,
+  });
+
+  final AuthScreenMode initialMode;
 
   @override
   ConsumerState<AuthScreen> createState() => _AuthScreenState();
 }
-
-enum _AuthMode { signIn, signUp }
 
 class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
@@ -25,7 +30,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _confirmController = TextEditingController();
 
   bool _isLoading = false;
-  _AuthMode _mode = _AuthMode.signIn;
+  late AuthScreenMode _mode;
+
+  @override
+  void initState() {
+    super.initState();
+    _mode = widget.initialMode;
+  }
+
+  @override
+  void didUpdateWidget(covariant AuthScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialMode != widget.initialMode) {
+      _mode = widget.initialMode;
+    }
+  }
 
   @override
   void dispose() {
@@ -35,7 +54,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     super.dispose();
   }
 
-  bool get _isSignIn => _mode == _AuthMode.signIn;
+  bool get _isSignIn => _mode == AuthScreenMode.signIn;
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
@@ -107,7 +126,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
-  void _switchMode(_AuthMode mode) {
+  void _switchMode(AuthScreenMode mode) {
     if (_mode == mode) return;
     setState(() => _mode = mode);
   }
@@ -352,8 +371,8 @@ class _CrestHeroState extends State<_CrestHero>
 class _ModeSelector extends StatelessWidget {
   const _ModeSelector({required this.mode, required this.onChanged});
 
-  final _AuthMode mode;
-  final ValueChanged<_AuthMode> onChanged;
+  final AuthScreenMode mode;
+  final ValueChanged<AuthScreenMode> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -365,7 +384,7 @@ class _ModeSelector extends StatelessWidget {
         border: Border.all(color: Colors.white24),
       ),
       child: Row(
-        children: _AuthMode.values.map((m) {
+        children: AuthScreenMode.values.map((m) {
           final isActive = m == mode;
           return Expanded(
             child: GestureDetector(
@@ -378,7 +397,7 @@ class _ModeSelector extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Text(
-                  m == _AuthMode.signIn ? 'Ingresar' : 'Crear cuenta',
+                  m == AuthScreenMode.signIn ? 'Ingresar' : 'Crear cuenta',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: isActive ? Colors.black : Colors.white70,
