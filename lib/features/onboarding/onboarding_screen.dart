@@ -18,31 +18,35 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _textController = TextEditingController();
   late final ScrollController _scrollController;
-  ProviderSubscription<OnboardingState>? _stateSubscription;
+  ProviderSubscription<OnboardingState>? _completionSub;
 
   @override
   void initState() {
     super.initState();
-    _completionSub = ref.listen<OnboardingState>(onboardingControllerProvider, (
-      previous,
-      next,
-    ) {
-      final justCompleted =
-          next.completed && !next.isSaving && previous?.completed != true;
-      final shouldScroll =
-          (previous?.entries.length ?? 0) != next.entries.length ||
-          (previous?.coachIsTyping ?? false) != next.coachIsTyping;
+    _scrollController = ScrollController();
+    _completionSub = ref.listenManual<OnboardingState>(
+      onboardingControllerProvider,
+      (previous, next) {
+        final justCompleted =
+            next.completed && !next.isSaving && previous?.completed != true;
+        final shouldScroll =
+            (previous?.entries.length ?? 0) != next.entries.length ||
+            (previous?.coachIsTyping ?? false) != next.coachIsTyping;
 
-      if (shouldScroll) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-      }
+        if (shouldScroll) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _scrollToBottom(),
+          );
+        }
 
-      if (justCompleted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _handleCompletion();
-        });
-      }
-    }, fireImmediately: true);
+        if (justCompleted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _handleCompletion();
+          });
+        }
+      },
+      fireImmediately: true,
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
@@ -69,7 +73,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   void dispose() {
-    _stateSubscription?.close();
+    _completionSub?.close();
     _scrollController.dispose();
     _textController.dispose();
     super.dispose();
