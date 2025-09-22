@@ -1,5 +1,5 @@
-﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/repositories/user_repository.dart';
 import '../profile/profile_providers.dart';
@@ -123,19 +123,23 @@ final onboardingStepsProvider = Provider<List<OnboardingStep>>((ref) {
 });
 
 final onboardingControllerProvider =
-    NotifierProvider<OnboardingController, OnboardingState>(
+    StateNotifierProvider<OnboardingController, OnboardingState>(
       OnboardingController.new,
     );
 
-class OnboardingController extends Notifier<OnboardingState> {
-  List<OnboardingStep> get steps => ref.read(onboardingStepsProvider);
-  UserRepository get _repository => ref.read(userRepositoryProvider);
+class OnboardingController extends StateNotifier<OnboardingState> {
+  OnboardingController(Ref ref)
+      : _ref = ref,
+        super(
+          OnboardingState.initial(
+            ref.read(onboardingStepsProvider),
+          ),
+        );
 
-  @override
-  OnboardingState build() {
-    final initialSteps = ref.watch(onboardingStepsProvider);
-    return OnboardingState.initial(initialSteps);
-  }
+  final Ref _ref;
+
+  List<OnboardingStep> get steps => _ref.read(onboardingStepsProvider);
+  UserRepository get _repository => _ref.read(userRepositoryProvider);
 
   OnboardingStep get currentStep {
     final step = _currentStepOrNull;
@@ -201,7 +205,7 @@ class OnboardingController extends Notifier<OnboardingState> {
   /// Avanza al siguiente paso del onboarding.
   void _advance() {
     if (!_hasSteps) {
-      if (!state.completed) {
+      if (!state.completed && mounted) {
         state = state.copyWith(
           completed: true,
           coachIsTyping: false,
@@ -213,6 +217,9 @@ class OnboardingController extends Notifier<OnboardingState> {
     final nextIndex = state.stepIndex + 1;
     if (nextIndex < steps.length) {
       final nextStep = steps[nextIndex];
+      if (!mounted) {
+        return;
+      }
       state = state.copyWith(
         stepIndex: nextIndex,
         coachIsTyping: true,
@@ -220,6 +227,10 @@ class OnboardingController extends Notifier<OnboardingState> {
       );
 
       Future.delayed(const Duration(milliseconds: 520), () {
+        if (!mounted) {
+          return;
+        }
+
         final current = state;
         if (current.stepIndex != nextIndex) {
           return;
@@ -233,12 +244,18 @@ class OnboardingController extends Notifier<OnboardingState> {
         }
         updatedEntries
             .add(OnboardingChatEntry(text: nextStep.prompt, fromCoach: true));
+        if (!mounted) {
+          return;
+        }
         state = current.copyWith(
           entries: updatedEntries,
           coachIsTyping: false,
         );
       });
     } else {
+      if (!mounted) {
+        return;
+      }
       state = state.copyWith(
         completed: true,
         coachIsTyping: false,
@@ -266,6 +283,9 @@ class OnboardingController extends Notifier<OnboardingState> {
       step.id: trimmed,
     };
     final displayText = step.id == 'password' ? '••••••' : trimmed;
+    if (!mounted) {
+      return;
+    }
     state = state.copyWith(
       answers: Map.unmodifiable(answers),
       entries: [
@@ -295,6 +315,9 @@ class OnboardingController extends Notifier<OnboardingState> {
       }
     }
 
+    if (!mounted) {
+      return;
+    }
     state = state.copyWith(
       answers: Map.unmodifiable(answers),
       entries: [
@@ -312,6 +335,9 @@ class OnboardingController extends Notifier<OnboardingState> {
       selection.remove(value);
     } else {
       selection.add(value);
+    }
+    if (!mounted) {
+      return;
     }
     state = state.copyWith(multiSelection: Set.unmodifiable(selection));
   }
@@ -340,6 +366,9 @@ class OnboardingController extends Notifier<OnboardingState> {
           .join(', ');
     }
 
+    if (!mounted) {
+      return;
+    }
     state = state.copyWith(
       answers: Map.unmodifiable(answers),
       entries: [
@@ -364,6 +393,9 @@ class OnboardingController extends Notifier<OnboardingState> {
         ? '$value ${step.unit}'
         : value;
 
+    if (!mounted) {
+      return;
+    }
     state = state.copyWith(
       answers: Map.unmodifiable(answers),
       entries: [
@@ -376,7 +408,7 @@ class OnboardingController extends Notifier<OnboardingState> {
 
   /// Guarda las respuestas en Firestore.
   Future<void> persist(User user) async {
-    if (state.isSaving || !state.completed) return;
+    if (!mounted || state.isSaving || !state.completed) return;
     state = state.copyWith(isSaving: true);
     final rawAnswers = Map<String, dynamic>.from(state.answers);
     final email = (rawAnswers['email'] as String?)?.trim();
@@ -415,9 +447,12 @@ class OnboardingController extends Notifier<OnboardingState> {
         workingUser.uid,
         answers: sanitizedAnswers,
       );
+      if (!mounted) return;
       state = state.copyWith(answers: Map.unmodifiable(sanitizedAnswers));
     } finally {
-      state = state.copyWith(isSaving: false);
+      if (mounted) {
+        state = state.copyWith(isSaving: false);
+      }
     }
   }
 
@@ -442,6 +477,9 @@ class OnboardingController extends Notifier<OnboardingState> {
         return idx != -1 && idx >= targetIndex;
       });
 
+    if (!mounted) {
+      return;
+    }
     state = state.copyWith(
       entries: updatedEntries,
       answers: Map.unmodifiable(updatedAnswers),
