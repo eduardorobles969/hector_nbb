@@ -83,5 +83,4 @@ class DefaultFirebaseOptions {
     authDomain: 'hector-nbb.firebaseapp.com',
     storageBucket: 'hector-nbb.firebasestorage.app',
   );
-
 }

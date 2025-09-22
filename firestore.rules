@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isCoachFor(uid) {
+      return isSignedIn() && exists(/databases/$(database)/documents/assignments/$(uid)/coaches/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
+    }
+
+    function noDietFields(data) {
+      return !data.keys().hasAny(['weight', 'calories', 'caloria', 'bmi', 'imc']);
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isCoachFor(uid) || isAdmin();
+      allow write: if isOwner(uid) && noDietFields(request.resource.data);
+    }
+
+    match /profiles/{uid} {
+      allow read: if isOwner(uid) || isCoachFor(uid) || isAdmin();
+      allow write: if isOwner(uid) && noDietFields(request.resource.data);
+    }
+
+    match /onboarding_answers/{uid} {
+      allow read, write: if isOwner(uid) || isCoachFor(uid) || isAdmin();
+    }
+
+    match /adaptive_plans/{uid} {
+      allow read: if isOwner(uid) || isCoachFor(uid) || isAdmin();
+      allow write: if (isOwner(uid) || isCoachFor(uid) || isAdmin()) && noDietFields(request.resource.data);
+    }
+
+    match /journal/{uid}/entries/{entryId} {
+      allow read: if isOwner(uid) || isCoachFor(uid) || isAdmin();
+      allow write: if isOwner(uid) && noDietFields(request.resource.data);
+    }
+
+    match /activities/{uid}/logs/{logId} {
+      allow read: if isOwner(uid) || isCoachFor(uid) || isAdmin();
+      allow write: if isOwner(uid);
+    }
+
+    match /coach_threads/{threadId} {
+      allow read, write: if isSignedIn() && request.resource.data.members.hasAny([request.auth.uid]);
+    }
+
+    match /coach_threads/{threadId}/messages/{messageId} {
+      allow read, write: if isSignedIn() && resource.data.members.hasAny([request.auth.uid]);
+    }
+
+    match /ai_insights/{uid}/{insightId} {
+      allow read: if isOwner(uid) || isCoachFor(uid) || isAdmin();
+      allow write: if (isCoachFor(uid) || isAdmin());
+    }
+
+    match /community/posts/{postId} {
+      allow read: if true;
+      allow create: if isSignedIn() && noDietFields(request.resource.data);
+      allow update, delete: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.authorUid) && noDietFields(request.resource.data);
+    }
+
+    match /community/posts/{postId}/comments/{commentId} {
+      allow read: if true;
+      allow create: if isSignedIn() && noDietFields(request.resource.data);
+      allow update, delete: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.authorUid) && noDietFields(request.resource.data);
+    }
+
+    match /lessons/{lessonId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /challenges/{challengeId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /achievements/{uid}/{achievementId} {
+      allow read, write: if isOwner(uid) || isCoachFor(uid) || isAdmin();
+    }
+
+    match /assignments/{uid}/coaches/{coachUid} {
+      allow read, write: if isOwner(uid) || request.auth.uid == coachUid || isAdmin();
+    }
+  }
+}
