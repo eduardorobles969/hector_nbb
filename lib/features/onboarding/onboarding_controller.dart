@@ -131,17 +131,41 @@ class OnboardingController extends Notifier<OnboardingState> {
   void _advance() {
     final nextIndex = state.stepIndex + 1;
     if (nextIndex < steps.length) {
-      final nextEntries = [
-        ...state.entries,
-        OnboardingChatEntry(text: steps[nextIndex].prompt, fromCoach: true),
-      ];
+      final prompt = steps[nextIndex].prompt;
       state = state.copyWith(
         stepIndex: nextIndex,
-        entries: nextEntries,
+        coachIsTyping: true,
         multiSelection: <String>{},
       );
+
+      Future.delayed(const Duration(milliseconds: 520), () {
+        final current = state;
+        if (current.stepIndex != nextIndex) {
+          return;
+        }
+
+        final updatedEntries = [
+          ...current.entries,
+          OnboardingChatEntry(text: prompt, fromCoach: true),
+        ];
+        state = current.copyWith(
+          entries: updatedEntries,
+          coachIsTyping: false,
+        );
+      });
     } else {
-      state = state.copyWith(completed: true);
+      state = state.copyWith(
+        completed: true,
+        coachIsTyping: false,
+        entries: [
+          ...state.entries,
+          const OnboardingChatEntry(
+            text:
+                'Increíble, dame un segundo para registrar todo y pulir tu plan.',
+            fromCoach: true,
+          ),
+        ],
+      );
     }
   }
 

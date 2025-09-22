@@ -93,7 +93,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Be at your best',
+                    'Bienvenido a Never Be Broken',
                     style: theme.textTheme.headlineMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -102,7 +102,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Accede a rutinas especiales y resultados que forjan leyendas.',
+                    'Entrena como los colosos. Elige si quieres comenzar la experiencia o ingresar con tu cuenta.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.white70,
                       height: 1.4,
@@ -120,36 +120,28 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 28),
-                  OutlinedButton(
+                  OutlinedButton.icon(
                     onPressed: _isProcessing
                         ? null
                         : () {
                             context.go('/auth');
                           },
+                    icon: const Icon(Icons.lock_open_rounded),
+                    label: const Text('INICIAR SESIÓN'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
                       side: BorderSide(color: Colors.white.withOpacity(0.7)),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
                       textStyle: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    child: const Text('LOG IN'),
                   ),
                   const SizedBox(height: 16),
-                  FilledButton(
+                  FilledButton.icon(
                     onPressed: _isProcessing ? null : _startQuestionnaire,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF1744),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      textStyle: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    child: _isProcessing
+                    icon: _isProcessing
                         ? const SizedBox(
                             width: 22,
                             height: 22,
@@ -160,7 +152,17 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                               strokeWidth: 2.6,
                             ),
                           )
-                        : const Text('GET STARTED'),
+                        : const Icon(Icons.bolt_rounded),
+                    label: Text(_isProcessing ? 'Preparando...' : 'EMPEZAR'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF1744),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                      textStyle: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
