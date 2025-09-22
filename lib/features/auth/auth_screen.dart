@@ -16,26 +16,18 @@ class AuthScreen extends ConsumerStatefulWidget {
   ConsumerState<AuthScreen> createState() => _AuthScreenState();
 }
 
-enum _AuthMode { signIn, signUp }
-
 class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmController = TextEditingController();
-
   bool _isLoading = false;
-  _AuthMode _mode = _AuthMode.signIn;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _confirmController.dispose();
     super.dispose();
   }
-
-  bool get _isSignIn => _mode == _AuthMode.signIn;
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
@@ -46,35 +38,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
     final auth = ref.read(firebaseAuthProvider);
     try {
-      UserCredential credential;
-      if (_isSignIn) {
-        credential = await auth.signInWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
-      } else {
-        credential = await auth.createUserWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
-      }
+      final credential = await auth.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
       final user = credential.user;
       final userRepo = ref.read(userRepositoryProvider);
       if (user != null) {
         await userRepo.ensureUserDocument(user, defaultRole: UserRole.coloso);
-        if (!_isSignIn && !user.emailVerified) {
-          await user.sendEmailVerification();
-        }
         final profile = await userRepo.fetchProfile(user.uid);
         final needsOnboarding = profile?.onboardingComplete != true;
         if (!mounted) return;
-        if (!_isSignIn) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Enviamos un correo para verificar tu cuenta.'),
-            ),
-          );
-        }
         context.go(needsOnboarding ? '/onboarding' : '/profile');
       }
     } on FirebaseAuthException catch (e) {
@@ -105,11 +79,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } catch (_) {
       _showError('No pudimos enviar el correo. Intenta de nuevo.');
     }
-  }
-
-  void _switchMode(_AuthMode mode) {
-    if (_mode == mode) return;
-    setState(() => _mode = mode);
   }
 
   void _showError(String message) {
@@ -162,15 +131,28 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const _CrestHero(),
-                      const SizedBox(height: 32),
-                      _ModeSelector(mode: _mode, onChanged: _switchMode),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 28),
+                      Text(
+                        'Bienvenido de vuelta',
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Inicia sesión para continuar forjando tu progreso. Si aún no tienes cuenta, toca "Empezar ahora" en la pantalla de bienvenida para crearla con el coach.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.white70,
+                              height: 1.4,
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 28),
                       _AuthCard(
                         formKey: _formKey,
                         emailController: _emailController,
                         passwordController: _passwordController,
-                        confirmController: _confirmController,
-                        isSignIn: _isSignIn,
                         isLoading: _isLoading,
                         onSubmit: _submit,
                         onForgot: _sendReset,
@@ -349,58 +331,11 @@ class _CrestHeroState extends State<_CrestHero>
   }
 }
 
-class _ModeSelector extends StatelessWidget {
-  const _ModeSelector({required this.mode, required this.onChanged});
-
-  final _AuthMode mode;
-  final ValueChanged<_AuthMode> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final selectedColor = Theme.of(context).colorScheme.primary;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        color: Colors.white.withOpacity(0.05),
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Row(
-        children: _AuthMode.values.map((m) {
-          final isActive = m == mode;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onChanged(m),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: isActive ? selectedColor : Colors.transparent,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Text(
-                  m == _AuthMode.signIn ? 'Ingresar' : 'Crear cuenta',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isActive ? Colors.black : Colors.white70,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
 class _AuthCard extends StatefulWidget {
   const _AuthCard({
     required this.formKey,
     required this.emailController,
     required this.passwordController,
-    required this.confirmController,
-    required this.isSignIn,
     required this.isLoading,
     required this.onSubmit,
     required this.onForgot,
@@ -409,8 +344,6 @@ class _AuthCard extends StatefulWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController emailController;
   final TextEditingController passwordController;
-  final TextEditingController confirmController;
-  final bool isSignIn;
   final bool isLoading;
   final VoidCallback onSubmit;
   final VoidCallback onForgot;
@@ -421,7 +354,6 @@ class _AuthCard extends StatefulWidget {
 
 class _AuthCardState extends State<_AuthCard> {
   bool _hidePass = true;
-  bool _hideConfirm = true;
 
   @override
   Widget build(BuildContext context) {
@@ -482,43 +414,17 @@ class _AuthCardState extends State<_AuthCard> {
                 return null;
               },
             ),
-            if (!widget.isSignIn) ...[
-              const SizedBox(height: 18),
-              _TextField(
-                controller: widget.confirmController,
-                label: 'Confirma tu contrasena',
-                obscureText: _hideConfirm,
-                autofillHints: const [AutofillHints.password],
-                suffix: IconButton(
-                  onPressed: () => setState(() => _hideConfirm = !_hideConfirm),
-                  icon: Icon(
-                    _hideConfirm ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.white54,
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Confirma tu contrasena.';
-                  }
-                  if (value.trim() != widget.passwordController.text.trim()) {
-                    return 'Las contrasenas no coinciden.';
-                  }
-                  return null;
-                },
-              ),
-            ],
             const SizedBox(height: 12),
-            if (widget.isSignIn)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: widget.isLoading ? null : widget.onForgot,
-                  child: const Text(
-                    'Recuperar contrasena',
-                    style: TextStyle(color: Colors.white70),
-                  ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: widget.isLoading ? null : widget.onForgot,
+                child: const Text(
+                  'Recuperar contrasena',
+                  style: TextStyle(color: Colors.white70),
                 ),
               ),
+            ),
             const SizedBox(height: 12),
             FilledButton(
               onPressed: widget.isLoading ? null : widget.onSubmit,
@@ -537,9 +443,7 @@ class _AuthCardState extends State<_AuthCard> {
                       width: 22,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(
-                      widget.isSignIn ? 'Entrar al cuartel' : 'Forjar destino',
-                    ),
+                  : const Text('Entrar al cuartel'),
             ),
           ],
         ),

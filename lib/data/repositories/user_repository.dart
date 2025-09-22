@@ -80,6 +80,7 @@ class UserRepository {
     final doc = _col.doc(uid);
     final payload = {
       'displayName': answers['displayName'] ?? '',
+      'email': answers['email'] ?? '',
       'fitnessLevel': answers['fitnessLevel'],
       'goals': answers['goals'] ?? <String>[],
       'gender': answers['gender'],

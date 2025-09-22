@@ -113,7 +113,14 @@ class OnboardingState {
 
   factory OnboardingState.initial(List<OnboardingStep> steps) {
     return OnboardingState(
-      entries: [OnboardingChatEntry(text: steps.first.prompt, fromCoach: true)],
+      entries: [
+        const OnboardingChatEntry(
+          text:
+              '¡Hey! Soy Héctor, tu coach. Vamos a conversar para pulir un plan hecho a tu medida.',
+          fromCoach: true,
+        ),
+        OnboardingChatEntry(text: steps.first.prompt, fromCoach: true),
+      ],
       stepIndex: 0,
       answers: <String, dynamic>{},
       multiSelection: <String>{},

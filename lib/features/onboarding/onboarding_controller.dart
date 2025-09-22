@@ -12,20 +12,20 @@ final onboardingStepsProvider = Provider<List<OnboardingStep>>((ref) {
   return [
     OnboardingStep(
       id: 'displayName',
-      prompt: '¿Cómo te llamas?',
+      prompt: '¿Cómo quieres que te llame durante tus sesiones?',
       type: OnboardingInputType.freeText,
-      hint: 'Escribe tu nombre como deseas que el coach te llame',
+      hint: 'Escribe tu nombre o apodo favorito',
     ),
     OnboardingStep(
       id: 'fitnessLevel',
-      prompt: '¿Qué nivel de condición tienes actualmente?',
+      prompt: 'Cuando entrenas hoy, ¿cómo describirías tu nivel?',
       type: OnboardingInputType.singleChoice,
       choices: ['novato', 'intermedio', 'avanzado'],
       choiceLabels: ['Novato', 'Intermedio', 'Avanzado'],
     ),
     OnboardingStep(
       id: 'goals',
-      prompt: '¿Cuáles son tus objetivos principales?',
+      prompt: 'Marca tus objetivos principales para forjar tu plan.',
       type: OnboardingInputType.multiChoice,
       choices: ['fuerza', 'musculo', 'bajar_grasa', 'resistir', 'tecnica'],
       choiceLabels: [
@@ -45,7 +45,7 @@ final onboardingStepsProvider = Provider<List<OnboardingStep>>((ref) {
     ),
     OnboardingStep(
       id: 'heightCm',
-      prompt: '¿Cuánto mides?',
+      prompt: 'Anota tu estatura para ajustar cargas y técnica.',
       type: OnboardingInputType.numericChoice,
       choices: [
         '150',
@@ -65,7 +65,7 @@ final onboardingStepsProvider = Provider<List<OnboardingStep>>((ref) {
     ),
     OnboardingStep(
       id: 'weightKg',
-      prompt: '¿Cuál es tu peso actual?',
+      prompt: '¿Cuál es tu peso actual? Me ayuda a balancear el plan.',
       type: OnboardingInputType.numericChoice,
       choices: [
         '55',
@@ -85,27 +85,39 @@ final onboardingStepsProvider = Provider<List<OnboardingStep>>((ref) {
     ),
     OnboardingStep(
       id: 'pullups',
-      prompt: '¿Cuántas dominadas puedes hacer sin pausa?',
+      prompt: '¿Cuántas dominadas logras sin pausa?',
       type: OnboardingInputType.singleChoice,
       choices: ['<10', '10-30', '30-50', '>50'],
     ),
     OnboardingStep(
       id: 'pushups',
-      prompt: '¿Cuántas lagartijas puedes hacer sin pausa?',
+      prompt: '¿Cuántas lagartijas seguidas te avientas?',
       type: OnboardingInputType.singleChoice,
       choices: ['<20', '20-40', '40-60', '>60'],
     ),
     OnboardingStep(
       id: 'squats',
-      prompt: '¿Cuántas sentadillas continuas logras?',
+      prompt: '¿Cuántas sentadillas continuas dominas?',
       type: OnboardingInputType.singleChoice,
       choices: ['<30', '30-60', '60-90', '>90'],
     ),
     OnboardingStep(
       id: 'dips',
-      prompt: '¿Cuántos fondos en paralelas completas tienes?',
+      prompt: '¿Cuántos fondos en paralelas completas dominas?',
       type: OnboardingInputType.singleChoice,
       choices: ['<10', '10-30', '30-50', '>50'],
+    ),
+    OnboardingStep(
+      id: 'email',
+      prompt: '¿A qué correo te envío tus rutinas y acceso?',
+      type: OnboardingInputType.freeText,
+      hint: 'tu@correo.com',
+    ),
+    OnboardingStep(
+      id: 'password',
+      prompt: 'Último paso: crea una contraseña poderosa para tu cuenta.',
+      type: OnboardingInputType.freeText,
+      hint: 'Mínimo 6 caracteres',
     ),
   ];
 });
@@ -127,21 +139,82 @@ class OnboardingController extends Notifier<OnboardingState> {
 
   OnboardingStep get currentStep => steps[state.stepIndex];
 
+  String? _bridgeForStep(OnboardingStep step, Map<String, dynamic> answers) {
+    switch (step.id) {
+      case 'fitnessLevel':
+        final name = answers['displayName'];
+        if (name is String && name.trim().isNotEmpty) {
+          return 'Genial, $name. Cuéntame cómo te sientes con tu nivel actual.';
+        }
+        return 'Genial, cuéntame cómo te sientes con tu nivel actual.';
+      case 'goals':
+        return 'Perfecto. Ahora enfoquémonos en tus metas principales.';
+      case 'gender':
+        return 'Para personalizar mejor tu plan, dime con qué género te identificas.';
+      case 'heightCm':
+        return 'Tomemos tus medidas para ajustar las cargas. ¿Cuánto mides?';
+      case 'weightKg':
+        return 'Gracias. Ahora, ¿cuál es tu peso actual?';
+      case 'pullups':
+        return 'Hablemos de tu fuerza en barra.';
+      case 'pushups':
+        return 'Anotado. ¿Y cuántas lagartijas seguidas dominas?';
+      case 'squats':
+        return 'Excelente. Cuéntame de tus sentadillas continuas.';
+      case 'dips':
+        return 'Casi listo. ¿Cuántos fondos completos puedes hacer?';
+      case 'email':
+        return 'Ya casi terminamos. Necesito el correo donde te enviaré tus rutinas.';
+      case 'password':
+        return 'Último paso antes de pulir tu plan: crea una contraseña poderosa.';
+      default:
+        return null;
+    }
+  }
+
   /// Avanza al siguiente paso del onboarding.
   void _advance() {
     final nextIndex = state.stepIndex + 1;
     if (nextIndex < steps.length) {
-      final nextEntries = [
-        ...state.entries,
-        OnboardingChatEntry(text: steps[nextIndex].prompt, fromCoach: true),
-      ];
+      final nextStep = steps[nextIndex];
       state = state.copyWith(
         stepIndex: nextIndex,
-        entries: nextEntries,
+        coachIsTyping: true,
         multiSelection: <String>{},
       );
+
+      Future.delayed(const Duration(milliseconds: 520), () {
+        final current = state;
+        if (current.stepIndex != nextIndex) {
+          return;
+        }
+
+        final updatedEntries = [...current.entries];
+        final bridge = _bridgeForStep(nextStep, current.answers);
+        if (bridge != null && bridge.isNotEmpty) {
+          updatedEntries
+              .add(OnboardingChatEntry(text: bridge, fromCoach: true));
+        }
+        updatedEntries
+            .add(OnboardingChatEntry(text: nextStep.prompt, fromCoach: true));
+        state = current.copyWith(
+          entries: updatedEntries,
+          coachIsTyping: false,
+        );
+      });
     } else {
-      state = state.copyWith(completed: true);
+      state = state.copyWith(
+        completed: true,
+        coachIsTyping: false,
+        entries: [
+          ...state.entries,
+          const OnboardingChatEntry(
+            text:
+                '¡Excelente! Dame un segundo para registrar todo y forjar tu plan personalizado.',
+            fromCoach: true,
+          ),
+        ],
+      );
     }
   }
 
@@ -151,11 +224,12 @@ class OnboardingController extends Notifier<OnboardingState> {
     if (trimmed.isEmpty) return;
     final answers = Map<String, dynamic>.from(state.answers);
     answers[currentStep.id] = trimmed;
+    final displayText = currentStep.id == 'password' ? '••••••' : trimmed;
     state = state.copyWith(
       answers: answers,
       entries: [
         ...state.entries,
-        OnboardingChatEntry(text: trimmed, fromCoach: false),
+        OnboardingChatEntry(text: displayText, fromCoach: false),
       ],
     );
     _advance();
@@ -249,10 +323,77 @@ class OnboardingController extends Notifier<OnboardingState> {
   Future<void> persist(User user) async {
     if (state.isSaving || !state.completed) return;
     state = state.copyWith(isSaving: true);
+    final rawAnswers = Map<String, dynamic>.from(state.answers);
+    final email = (rawAnswers['email'] as String?)?.trim();
+    final password = (rawAnswers['password'] as String?)?.trim();
+    final displayName = (rawAnswers['displayName'] as String?)?.trim();
+    final sanitizedAnswers = Map<String, dynamic>.from(rawAnswers)
+      ..remove('password');
+    if (email != null) {
+      sanitizedAnswers['email'] = email;
+    }
     try {
-      await _repository.saveOnboardingIntake(user.uid, answers: state.answers);
+      User workingUser = FirebaseAuth.instance.currentUser ?? user;
+      if (displayName != null && displayName.isNotEmpty) {
+        await workingUser.updateDisplayName(displayName);
+      }
+      if (workingUser.isAnonymous) {
+        if (email != null && password != null && email.isNotEmpty) {
+          final credential = EmailAuthProvider.credential(
+            email: email,
+            password: password,
+          );
+          final result = await workingUser.linkWithCredential(credential);
+          workingUser = result.user ?? workingUser;
+        } else {
+          throw FirebaseAuthException(
+            code: 'missing-email',
+            message: 'Debes proporcionar un correo y una contraseña.',
+          );
+        }
+      } else if (email != null && email.isNotEmpty && workingUser.email != email) {
+        await workingUser.updateEmail(email);
+      }
+
+      await _repository.ensureUserDocument(workingUser);
+      await _repository.saveOnboardingIntake(
+        workingUser.uid,
+        answers: sanitizedAnswers,
+      );
+      state = state.copyWith(answers: sanitizedAnswers);
     } finally {
       state = state.copyWith(isSaving: false);
     }
+  }
+
+  /// Permite reabrir un paso específico para que el atleta corrija su respuesta.
+  void reopenStep(String stepId, {String? coachMessage}) {
+    final targetIndex = steps.indexWhere((step) => step.id == stepId);
+    if (targetIndex == -1) return;
+
+    final updatedEntries = List<OnboardingChatEntry>.from(state.entries);
+    if (state.completed && updatedEntries.isNotEmpty) {
+      updatedEntries.removeLast();
+    }
+    if (coachMessage != null) {
+      updatedEntries.add(OnboardingChatEntry(text: coachMessage, fromCoach: true));
+    }
+    updatedEntries
+        .add(OnboardingChatEntry(text: steps[targetIndex].prompt, fromCoach: true));
+
+    final updatedAnswers = Map<String, dynamic>.from(state.answers)
+      ..removeWhere((key, _) {
+        final idx = steps.indexWhere((step) => step.id == key);
+        return idx != -1 && idx >= targetIndex;
+      });
+
+    state = state.copyWith(
+      entries: updatedEntries,
+      answers: updatedAnswers,
+      stepIndex: targetIndex,
+      completed: false,
+      coachIsTyping: false,
+      multiSelection: <String>{},
+    );
   }
 }
