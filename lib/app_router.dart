@@ -15,6 +15,7 @@ import 'features/plan/plan_screen.dart';
 import 'features/profile/profile_providers.dart';
 import 'features/profile/profile_screen.dart';
 import 'features/splash/splash_screen.dart';
+import 'features/welcome/welcome_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateChangesProvider);
@@ -33,6 +34,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     refreshListenable: GoRouterRefreshStream(auth.authStateChanges()),
     routes: [
       GoRoute(path: '/', builder: (_, __) => const SplashScreen()),
+      GoRoute(path: '/welcome', builder: (_, __) => const WelcomeScreen()),
       GoRoute(path: '/auth', builder: (_, __) => const AuthScreen()),
       GoRoute(
         path: '/onboarding',
@@ -55,6 +57,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (ctx, state) {
       final isSplashRoute = state.uri.path == '/';
       final isAuthRoute = state.uri.path == '/auth';
+      final isWelcomeRoute = state.uri.path == '/welcome';
       final isOnboardingRoute = state.uri.path == '/onboarding';
 
       if (authState.isLoading) {
@@ -64,10 +67,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final user = authState.asData?.value;
 
       if (user == null) {
-        if (isAuthRoute || isSplashRoute) {
+        if (isAuthRoute || isSplashRoute || isWelcomeRoute) {
           return null;
         }
-        return '/auth';
+        return '/welcome';
       }
 
       final shouldOnboard = needsOnboarding();
@@ -76,6 +79,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
       if (!shouldOnboard && isOnboardingRoute) {
         return '/profile';
+      }
+      if (isWelcomeRoute) {
+        return shouldOnboard ? '/onboarding' : '/profile';
       }
       if (isAuthRoute) {
         return shouldOnboard ? '/onboarding' : '/profile';

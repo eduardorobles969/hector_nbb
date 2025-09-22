@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'onboarding_controller.dart';
 import 'onboarding_models.dart';
@@ -33,7 +34,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       if (user == null) return;
       await controller.persist(user);
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed('/profile');
+      context.go('/profile');
     }
 
     // Ejecuta la verificación al construir.
