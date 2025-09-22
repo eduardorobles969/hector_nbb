@@ -20,7 +20,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   void initState() {
     super.initState();
-    _completionSub = ref.listen<OnboardingState>(
+    _completionSub = ref.listenManual<OnboardingState>(
       onboardingControllerProvider,
       (previous, next) {
         final justCompleted =
@@ -31,6 +31,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           });
         }
       },
+      fireImmediately: true,
     );
   }
 
