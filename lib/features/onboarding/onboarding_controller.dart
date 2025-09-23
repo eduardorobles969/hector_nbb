@@ -423,6 +423,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     }
     try {
       User workingUser = FirebaseAuth.instance.currentUser ?? user;
+      final previousEmail = workingUser.email;
       if (displayName != null && displayName.isNotEmpty) {
         await workingUser.updateDisplayName(displayName);
       }
@@ -441,6 +442,20 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           );
         }
       } else if (email != null && email.isNotEmpty && workingUser.email != email) {
+        if (previousEmail == null ||
+            previousEmail.isEmpty ||
+            password == null ||
+            password.isEmpty) {
+          throw FirebaseAuthException(
+            code: 'requires-recent-login',
+            message: 'Debes iniciar sesión nuevamente para actualizar tu correo.',
+          );
+        }
+        final credential = EmailAuthProvider.credential(
+          email: previousEmail,
+          password: password,
+        );
+        await workingUser.reauthenticateWithCredential(credential);
         await workingUser.updateEmail(email);
       }
 
