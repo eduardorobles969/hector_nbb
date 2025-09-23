@@ -116,57 +116,46 @@ class _PrimeNavIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final iconColor =
-        selected ? colorScheme.primary : colorScheme.onSurfaceVariant;
     final accent = const Color(0xFFD0202A);
+    final textColor = selected ? Colors.white : colorScheme.onSurfaceVariant;
 
     return SizedBox(
-      width: 64,
-      height: 52,
+      width: 76,
+      height: 44,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            height: 20,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
             decoration: BoxDecoration(
               color: accent,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x33000000),
                   blurRadius: 6,
-                  offset: Offset(0, 2),
+                  offset: Offset(0, 3),
                 ),
               ],
             ),
-            alignment: Alignment.center,
             child: const Text(
               'PRIME',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
               ),
             ),
           ),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: selected ? accent : iconColor.withOpacity(0.3),
-                width: 2,
-              ),
-            ),
-            child: Icon(
-              selected
-                  ? Icons.workspace_premium
-                  : Icons.workspace_premium_outlined,
-              size: 24,
-              color: iconColor,
+          const SizedBox(height: 4),
+          Text(
+            'COLOSO',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.2,
+              color: textColor,
             ),
           ),
         ],
