@@ -52,6 +52,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const CommunityScreen(),
           ),
           GoRoute(path: '/prime', builder: (_, __) => const PrimeScreen()),
+          GoRoute(
+            path: '/prime/contact',
+            builder: (_, __) => const PrimeLeadScreen(),
+          ),
           GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
         ],
       ),
