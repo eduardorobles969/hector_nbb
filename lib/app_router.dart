@@ -14,6 +14,7 @@ import 'features/onboarding/onboarding_screen.dart';
 import 'features/plan/plan_screen.dart';
 import 'features/profile/profile_providers.dart';
 import 'features/profile/profile_screen.dart';
+import 'features/prime/prime_lead_screen.dart';
 import 'features/prime/prime_screen.dart';
 import 'features/splash/splash_screen.dart';
 import 'features/welcome/welcome_screen.dart';
