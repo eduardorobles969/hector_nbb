@@ -57,14 +57,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         iconBuilder: _simpleIcon(Icons.groups),
       ),
       _NavItem(
-        path: '/prime',
-        label: 'PRIME Coloso',
-        iconBuilder: (selected) => _PrimeNavIcon(selected: selected),
-      ),
-      _NavItem(
         path: '/profile',
         label: 'Perfil',
         iconBuilder: _simpleIcon(Icons.person),
+      ),
+      _NavItem(
+        path: '/prime',
+        label: 'PRIME Coloso',
+        iconBuilder: (selected) => _PrimeNavIcon(selected: selected),
       ),
     ];
     if (role == UserRole.coach) {
@@ -117,35 +117,63 @@ class _PrimeNavIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final iconColor = selected ? colorScheme.primary : colorScheme.onSurfaceVariant;
+    final accent = const Color(0xFFD0202A);
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Icon(
-          selected ? Icons.workspace_premium : Icons.workspace_premium_outlined,
-          color: iconColor,
-        ),
-        Positioned(
-          top: -4,
-          right: -12,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              'PRIME',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 8,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
+    return SizedBox(
+      width: 48,
+      height: 40,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            top: -8,
+            left: 2,
+            right: 2,
+            child: Container(
+              height: 20,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    blurRadius: 6,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                'PRIME',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1,
+                ),
               ),
             ),
           ),
-        ),
-      ],
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected ? accent : iconColor.withOpacity(0.3),
+                  width: 2,
+                ),
+              ),
+              child: Icon(
+                selected ? Icons.workspace_premium : Icons.workspace_premium_outlined,
+                size: 24,
+                color: iconColor,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
