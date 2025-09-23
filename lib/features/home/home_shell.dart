@@ -63,7 +63,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ),
       _NavItem(
         path: '/prime',
-        label: 'PRIME COLOSO',
+        label: 'Plan',
         iconBuilder: (selected) => _PrimeNavIcon(selected: selected),
       ),
     ];
