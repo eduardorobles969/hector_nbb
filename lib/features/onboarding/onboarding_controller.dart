@@ -130,9 +130,9 @@ class OnboardingController extends ChangeNotifier {
   OnboardingController({
     List<OnboardingStep>? steps,
     UserRepository? repository,
-  })  : _steps = List.unmodifiable(steps ?? buildDefaultOnboardingSteps()),
-        _repository = repository ?? UserRepository(),
-        _state = OnboardingState.initial(steps ?? buildDefaultOnboardingSteps());
+  }) : _steps = List.unmodifiable(steps ?? buildDefaultOnboardingSteps()),
+       _repository = repository ?? UserRepository(),
+       _state = OnboardingState.initial(steps ?? buildDefaultOnboardingSteps());
 
   final List<OnboardingStep> _steps;
   final UserRepository _repository;
@@ -213,12 +213,7 @@ class OnboardingController extends ChangeNotifier {
   void _advance() {
     if (!_hasSteps) {
       if (!_state.completed) {
-        _updateState(
-          _state.copyWith(
-            completed: true,
-            coachIsTyping: false,
-          ),
-        );
+        _updateState(_state.copyWith(completed: true, coachIsTyping: false));
       }
       return;
     }
@@ -256,10 +251,7 @@ class OnboardingController extends ChangeNotifier {
         );
 
         _updateState(
-          current.copyWith(
-            entries: updatedEntries,
-            coachIsTyping: false,
-          ),
+          current.copyWith(entries: updatedEntries, coachIsTyping: false),
         );
       });
     } else {
@@ -285,10 +277,7 @@ class OnboardingController extends ChangeNotifier {
 
     final trimmed = value.trim();
     if (trimmed.isEmpty) return;
-    final answers = {
-      ..._state.answers,
-      step.id: trimmed,
-    };
+    final answers = {..._state.answers, step.id: trimmed};
     final displayText = step.id == 'password' ? '••••••' : trimmed;
 
     _updateState(
@@ -307,10 +296,7 @@ class OnboardingController extends ChangeNotifier {
     final step = _currentStepOrNull;
     if (step == null) return;
 
-    final answers = {
-      ..._state.answers,
-      step.id: choice,
-    };
+    final answers = {..._state.answers, step.id: choice};
 
     String label = choice;
     if (step.choiceLabels != null) {
@@ -340,11 +326,7 @@ class OnboardingController extends ChangeNotifier {
       selection.add(value);
     }
 
-    _updateState(
-      _state.copyWith(
-        multiSelection: Set.unmodifiable(selection),
-      ),
-    );
+    _updateState(_state.copyWith(multiSelection: Set.unmodifiable(selection)));
   }
 
   void confirmMulti() {
@@ -387,10 +369,7 @@ class OnboardingController extends ChangeNotifier {
     final step = _currentStepOrNull;
     if (step == null) return;
 
-    final answers = {
-      ..._state.answers,
-      step.id: value,
-    };
+    final answers = {..._state.answers, step.id: value};
     final label = step.unit != null ? '$value ${step.unit}' : value;
 
     _updateState(
@@ -413,6 +392,8 @@ class OnboardingController extends ChangeNotifier {
     final email = (rawAnswers['email'] as String?)?.trim();
     final password = (rawAnswers['password'] as String?)?.trim();
     final displayName = (rawAnswers['displayName'] as String?)?.trim();
+
+    // Lo que guardaremos en Firestore (sin password)
     final sanitizedAnswers = Map<String, dynamic>.from(rawAnswers)
       ..remove('password');
     if (email != null) {
@@ -420,11 +401,14 @@ class OnboardingController extends ChangeNotifier {
     }
 
     try {
-      User workingUser = FirebaseAuth.instance.currentUser ?? user;
+      var workingUser = FirebaseAuth.instance.currentUser ?? user;
+
+      // 1) Actualiza displayName si viene
       if (displayName != null && displayName.isNotEmpty) {
         await workingUser.updateDisplayName(displayName);
       }
 
+      // 2) Si el usuario es anónimo, hacemos "upgrade" linkeando email/password
       if (workingUser.isAnonymous) {
         if (email != null && password != null && email.isNotEmpty) {
           final credential = EmailAuthProvider.credential(
@@ -432,17 +416,47 @@ class OnboardingController extends ChangeNotifier {
             password: password,
           );
           final result = await workingUser.linkWithCredential(credential);
-          workingUser = result.user ?? workingUser;
+          workingUser = result.user ?? workingUser; // ya no es anónimo
         } else {
           throw FirebaseAuthException(
             code: 'missing-email',
             message: 'Debes proporcionar un correo y una contraseña.',
           );
         }
-      } else if (email != null && email.isNotEmpty && workingUser.email != email) {
-        await workingUser.updateEmail(email);
+      } else {
+        // 3) Si NO es anónimo y el email cambió, usar verifyBeforeUpdateEmail (firebase_auth v6)
+        if (email != null && email.isNotEmpty && workingUser.email != email) {
+          try {
+            await workingUser.verifyBeforeUpdateEmail(email);
+            // Marcamos que el cambio está pendiente hasta que el usuario confirme el email
+            sanitizedAnswers['pendingEmail'] = email;
+
+            // Mensaje en el chat para avisar la verificación
+            final updatedEntries = [
+              ..._state.entries,
+              const OnboardingChatEntry(
+                text:
+                    'Te envié un correo para confirmar tu nuevo email. Abre el enlace para completar el cambio.',
+                fromCoach: true,
+              ),
+            ];
+            _updateState(_state.copyWith(entries: updatedEntries));
+          } on FirebaseAuthException catch (e) {
+            if (e.code == 'requires-recent-login') {
+              // Reautenticación requerida para cambiar el correo (operación sensible)
+              throw FirebaseAuthException(
+                code: e.code,
+                message:
+                    'Por seguridad, vuelve a iniciar sesión para cambiar tu correo y vuelve a intentarlo.',
+              );
+            } else {
+              rethrow;
+            }
+          }
+        }
       }
 
+      // 4) Asegura el documento del usuario y guarda el intake del onboarding
       await _repository.ensureUserDocument(workingUser);
       await _repository.saveOnboardingIntake(
         workingUser.uid,
@@ -451,9 +465,7 @@ class OnboardingController extends ChangeNotifier {
 
       if (_disposed) return;
       _updateState(
-        _state.copyWith(
-          answers: Map.unmodifiable(sanitizedAnswers),
-        ),
+        _state.copyWith(answers: Map.unmodifiable(sanitizedAnswers)),
       );
     } finally {
       if (!_disposed) {
@@ -489,9 +501,7 @@ class OnboardingController extends ChangeNotifier {
         OnboardingChatEntry(text: coachMessage, fromCoach: true),
       );
     }
-    updatedEntries.add(
-      OnboardingChatEntry(text: prompt, fromCoach: true),
-    );
+    updatedEntries.add(OnboardingChatEntry(text: prompt, fromCoach: true));
 
     final updatedAnswers = Map<String, dynamic>.from(_state.answers)
       ..removeWhere((key, _) {
