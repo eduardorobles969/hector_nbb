@@ -13,7 +13,81 @@ class WelcomeScreen extends ConsumerStatefulWidget {
 }
 
 class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
+  final PageController _pageController = PageController(viewportFraction: 0.82);
   bool _isStarting = false;
+  int _currentPage = 0;
+  double _pageOffset = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageOffset = _pageController.initialPage.toDouble();
+    _pageController.addListener(_handlePageOffset);
+  }
+
+  void _handlePageOffset() {
+    final value =
+        _pageController.page ?? _pageController.initialPage.toDouble();
+    if (value != _pageOffset) {
+      setState(() => _pageOffset = value);
+    }
+  }
+
+  static const List<_WelcomeSlideData> _slides = [
+    _WelcomeSlideData(
+      imageAsset: 'assets/HectorNBB.png',
+      cardTitle: 'Forge Mode',
+      cardSubtitle: 'Rutinas de élite, resultados reales.',
+      headlinePrefix: 'Bienvenido Coloso,',
+      highlight: 'Never Be Broken',
+      description:
+          'Forja tu cuenta, responde el cuestionario inicial y te guiaremos paso a paso.',
+      highlightColor: Color(0xFFFF1744),
+      backgroundGradient: [Color(0xFF1C1C1C), Color(0xFF090909)],
+      cardGradient: [Color(0xFFB71C1C), Color(0xFFD32F2F)],
+      strokeColor: Color(0xCCFFFFFF),
+      overlayShade: Color(0x88000000),
+    ),
+    _WelcomeSlideData(
+      imageAsset: 'assets/MonochromeOnTransparent.png',
+      cardTitle: 'Momentum Mode',
+      cardSubtitle: 'Analíticas para monitorear cada progreso.',
+      headlinePrefix: 'Tu progreso merece',
+      highlight: 'precisión total',
+      description:
+          'Sincroniza tus métricas, descubre patrones y mantén el enfoque con reportes claros.',
+      highlightColor: Color(0xFF00E5FF),
+      backgroundGradient: [Color(0xFF131313), Color(0xFF050505)],
+      cardGradient: [Color(0xFF263238), Color(0xFF37474F)],
+      strokeColor: Color(0xB3FFFFFF),
+      overlayShade: Color(0xAA000000),
+      imageTint: Color(0xFFE0F7FA),
+      imageBlendMode: BlendMode.srcIn,
+    ),
+    _WelcomeSlideData(
+      imageAsset: 'assets/WhiteOnTransparent.png',
+      cardTitle: 'Legacy Mode',
+      cardSubtitle: 'Inspiración constante, disciplina diaria.',
+      headlinePrefix: 'El camino es duro,',
+      highlight: 'pero tú más',
+      description:
+          'Crea hábitos irrompibles, desbloquea retos épicos y comparte tu evolución con la tribu.',
+      highlightColor: Color(0xFFFF80AB),
+      backgroundGradient: [Color(0xFF180B1E), Color(0xFF0B040F)],
+      cardGradient: [Color(0xFF8E24AA), Color(0xFFD81B60)],
+      strokeColor: Color(0xB3FFFFFF),
+      overlayShade: Color(0x99000000),
+      imageTint: Colors.white,
+      imageBlendMode: BlendMode.srcIn,
+    ),
+  ];
+
+  @override
+  void dispose() {
+    _pageController.removeListener(_handlePageOffset);
+    _pageController.dispose();
+    super.dispose();
+  }
 
   void _openAuth() {
     context.go('/auth');
@@ -57,13 +131,23 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final slide = _slides[_currentPage];
+    final accentColor = _resolveAccentColor();
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
           children: [
-            const Expanded(child: _WelcomeHero()),
+            Expanded(
+              child: _WelcomeHero(
+                controller: _pageController,
+                slides: _slides,
+                currentPage: _currentPage,
+                pageOffset: _pageOffset,
+                onPageChanged: (page) => setState(() => _currentPage = page),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(32, 12, 32, 32),
               child: Column(
@@ -71,23 +155,23 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                 children: [
                   RichText(
                     text: TextSpan(
-                      text: 'Bienvenido Coloso, ',
+                      text: '${slide.headlinePrefix} ',
                       style: theme.textTheme.headlineMedium?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.8,
                       ),
-                      children: const [
+                      children: [
                         TextSpan(
-                          text: 'Never Be Broken',
-                          style: TextStyle(color: Color(0xFFFF1744)),
+                          text: slide.highlight,
+                          style: TextStyle(color: accentColor),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Forja tu cuenta, responde el cuestionario inicial y te guiaremos paso a paso.',
+                    slide.description,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.white70,
                       height: 1.4,
@@ -96,12 +180,14 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                   const SizedBox(height: 28),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      _PageDot(active: true),
-                      SizedBox(width: 8),
-                      _PageDot(active: false),
-                      SizedBox(width: 8),
-                      _PageDot(active: false),
+                    children: [
+                      for (int i = 0; i < _slides.length; i++) ...[
+                        _PageDot(
+                          active: i == _currentPage,
+                          activeColor: accentColor,
+                        ),
+                        if (i != _slides.length - 1) const SizedBox(width: 8),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 28),
@@ -130,11 +216,11 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                       child: _isStarting
                           ? const SizedBox(
                               key: ValueKey('loading'),
-                              width: 20,
-                              height: 20,
+                              width: 22,
+                              height: 22,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.2,
-                                valueColor: AlwaysStoppedAnimation(
+                                valueColor: const AlwaysStoppedAnimation<Color>(
                                   Colors.white,
                                 ),
                               ),
@@ -168,89 +254,197 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       ),
     );
   }
+
+  Color _resolveAccentColor() {
+    final clamped = _pageOffset.clamp(0, _slides.length - 1).toDouble();
+    final lowerIndex = clamped.floor();
+    final upperIndex = clamped.ceil();
+
+    if (lowerIndex == upperIndex) {
+      return _slides[lowerIndex].highlightColor;
+    }
+
+    final t = clamped - lowerIndex;
+    final lowerColor = _slides[lowerIndex].highlightColor;
+    final upperColor = _slides[upperIndex].highlightColor;
+
+    return Color.lerp(lowerColor, upperColor, t) ?? lowerColor;
+  }
 }
 
 class _WelcomeHero extends StatelessWidget {
-  const _WelcomeHero();
+  const _WelcomeHero({
+    required this.controller,
+    required this.slides,
+    required this.currentPage,
+    required this.pageOffset,
+    required this.onPageChanged,
+  });
+
+  final PageController controller;
+  final List<_WelcomeSlideData> slides;
+  final int currentPage;
+  final double pageOffset;
+  final ValueChanged<int> onPageChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
+    final backgroundGradient = _resolveGradient();
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOut,
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF1C1C1C), Color(0xFF090909)],
+          colors: backgroundGradient,
         ),
       ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/HectorNBB.png',
-              fit: BoxFit.contain,
-              color: Colors.white.withOpacity(0.12),
-              colorBlendMode: BlendMode.srcATop,
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
+      child: PageView.builder(
+        controller: controller,
+        physics: const BouncingScrollPhysics(),
+        clipBehavior: Clip.none,
+        onPageChanged: onPageChanged,
+        itemCount: slides.length,
+        itemBuilder: (context, index) {
+          final data = slides[index];
+          final isActive = index == currentPage;
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 28),
+            child: _HeroSlideCard(data: data, isActive: isActive),
+          );
+        },
+      ),
+    );
+  }
+
+  List<Color> _resolveGradient() {
+    final clamped = pageOffset.clamp(0, slides.length - 1).toDouble();
+    final lowerIndex = clamped.floor();
+    final upperIndex = clamped.ceil();
+
+    if (lowerIndex == upperIndex) {
+      return slides[lowerIndex].backgroundGradient;
+    }
+
+    final t = clamped - lowerIndex;
+    final lower = slides[lowerIndex].backgroundGradient;
+    final upper = slides[upperIndex].backgroundGradient;
+
+    final length = lower.length < upper.length ? lower.length : upper.length;
+
+    return List<Color>.generate(
+      length,
+      (i) => Color.lerp(lower[i], upper[i], t) ?? lower[i],
+    );
+  }
+}
+
+class _HeroSlideCard extends StatelessWidget {
+  const _HeroSlideCard({required this.data, required this.isActive});
+
+  final _WelcomeSlideData data;
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      scale: isActive ? 1.0 : 0.93,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOut,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: AspectRatio(
+          aspectRatio: 3 / 4,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
                 child: DecoratedBox(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFFB71C1C), Color(0xFFD32F2F)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: data.highlightColor.withOpacity(0.25),
+                        blurRadius: isActive ? 28 : 16,
+                        offset: const Offset(0, 12),
+                      ),
+                    ],
                   ),
-                  child: AspectRatio(
-                    aspectRatio: 3 / 4,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(30),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        Image.asset('assets/HectorNBB.png', fit: BoxFit.cover),
                         DecoratedBox(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [
-                                Colors.black.withOpacity(0.1),
-                                Colors.black.withOpacity(0.6),
-                              ],
+                              colors: data.cardGradient,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Image.asset(
+                              data.imageAsset,
+                              fit: BoxFit.contain,
+                              color: data.imageTint,
+                              colorBlendMode: data.imageBlendMode,
+                            ),
+                          ),
+                        ),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
+                              colors: [Colors.transparent, data.overlayShade],
                             ),
                           ),
                         ),
                         Align(
                           alignment: Alignment.bottomLeft,
                           child: Padding(
-                            padding: const EdgeInsets.all(20),
+                            padding: const EdgeInsets.all(24),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
+                              children: [
                                 Text(
-                                  'Forge Mode',
-                                  style: TextStyle(
+                                  data.cardTitle,
+                                  style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.3,
                                   ),
                                 ),
-                                SizedBox(height: 8),
+                                const SizedBox(height: 10),
                                 Text(
-                                  'Rutinas de elite, resultados reales.',
+                                  data.cardSubtitle,
                                   style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 14,
+                                    color: Colors.white.withOpacity(0.8),
+                                    fontSize: 15,
+                                    height: 1.35,
                                   ),
                                 ),
                               ],
+                            ),
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: data.strokeColor.withOpacity(0.25),
+                                width: 1.2,
+                              ),
+                              borderRadius: BorderRadius.circular(30),
                             ),
                           ),
                         ),
@@ -259,18 +453,114 @@ class _WelcomeHero extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
+              Positioned(
+                top: -32,
+                left: 0,
+                right: 0,
+                child: _BrushStroke(top: true, color: data.strokeColor),
+              ),
+              Positioned(
+                bottom: -32,
+                left: 0,
+                right: 0,
+                child: _BrushStroke(top: false, color: data.strokeColor),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
+class _BrushStroke extends StatelessWidget {
+  const _BrushStroke({required this.top, required this.color});
+
+  final bool top;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return FractionallySizedBox(
+      widthFactor: 1.2,
+      alignment: Alignment.center,
+      child: Transform.translate(
+        offset: top ? const Offset(0, -22) : const Offset(0, 22),
+        child: SizedBox(
+          height: 64,
+          child: CustomPaint(
+            painter: _BrushStrokePainter(
+              color: color.withOpacity(0.65),
+              flipVertical: !top,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BrushStrokePainter extends CustomPainter {
+  const _BrushStrokePainter({required this.color, required this.flipVertical});
+
+  final Color color;
+  final bool flipVertical;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    if (flipVertical) {
+      canvas.save();
+      canvas.translate(0, size.height);
+      canvas.scale(1, -1);
+    }
+
+    final path = Path()
+      ..moveTo(-32, size.height * 0.9)
+      ..quadraticBezierTo(
+        size.width * 0.15,
+        size.height * 0.25,
+        size.width * 0.32,
+        size.height * 0.6,
+      )
+      ..quadraticBezierTo(
+        size.width * 0.55,
+        size.height * 1.05,
+        size.width * 0.74,
+        size.height * 0.4,
+      )
+      ..quadraticBezierTo(
+        size.width * 0.92,
+        size.height * 0.05,
+        size.width + 32,
+        size.height * 0.7,
+      )
+      ..lineTo(size.width + 48, size.height + 24)
+      ..lineTo(-48, size.height + 24)
+      ..close();
+
+    canvas.drawPath(path, paint);
+
+    if (flipVertical) {
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BrushStrokePainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.flipVertical != flipVertical;
+  }
+}
+
 class _PageDot extends StatelessWidget {
-  const _PageDot({required this.active});
+  const _PageDot({required this.active, required this.activeColor});
 
   final bool active;
+  final Color activeColor;
 
   @override
   Widget build(BuildContext context) {
@@ -279,9 +569,41 @@ class _PageDot extends StatelessWidget {
       width: active ? 12 : 8,
       height: active ? 12 : 8,
       decoration: BoxDecoration(
-        color: active ? Colors.white : Colors.white.withOpacity(0.4),
+        color: active ? activeColor : Colors.white.withOpacity(0.4),
         shape: BoxShape.circle,
       ),
     );
   }
+}
+
+class _WelcomeSlideData {
+  const _WelcomeSlideData({
+    required this.imageAsset,
+    required this.cardTitle,
+    required this.cardSubtitle,
+    required this.headlinePrefix,
+    required this.highlight,
+    required this.description,
+    required this.highlightColor,
+    required this.backgroundGradient,
+    required this.cardGradient,
+    required this.strokeColor,
+    required this.overlayShade,
+    this.imageTint,
+    this.imageBlendMode,
+  });
+
+  final String imageAsset;
+  final String cardTitle;
+  final String cardSubtitle;
+  final String headlinePrefix;
+  final String highlight;
+  final String description;
+  final Color highlightColor;
+  final List<Color> backgroundGradient;
+  final List<Color> cardGradient;
+  final Color strokeColor;
+  final Color overlayShade;
+  final Color? imageTint;
+  final BlendMode? imageBlendMode;
 }
