@@ -1,15 +1,18 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../data/repositories/user_repository.dart';
-import '../profile/profile_providers.dart';
 import 'onboarding_models.dart';
 
-/// Provee la lista de pasos del onboarding.
-/// NOTA: no usamos `const` en la lista para evitar conflictos si tu constructor
-/// no es const. (Puedes volverlo más adelante si quieres).
-final onboardingStepsProvider = Provider<List<OnboardingStep>>((ref) {
-  return [
+/// Mensaje final que muestra el coach al terminar el onboarding.
+const _completionMessage =
+    '¡Excelente! Dame un segundo para registrar todo y forjar tu plan personalizado.';
+
+/// Genera la lista base de pasos que conforman el onboarding.
+List<OnboardingStep> buildDefaultOnboardingSteps() {
+  return const [
     OnboardingStep(
       id: 'displayName',
       prompt: '¿Cómo quieres que te llame durante tus sesiones?',
@@ -120,29 +123,25 @@ final onboardingStepsProvider = Provider<List<OnboardingStep>>((ref) {
       hint: 'Mínimo 6 caracteres',
     ),
   ];
-});
+}
 
-final onboardingControllerProvider =
-    StateNotifierProvider<OnboardingController, OnboardingState>(
-      OnboardingController.new,
-    );
+/// Controlador del flujo de onboarding sin dependencias de Riverpod.
+class OnboardingController extends ChangeNotifier {
+  OnboardingController({
+    List<OnboardingStep>? steps,
+    UserRepository? repository,
+  })  : _steps = List.unmodifiable(steps ?? buildDefaultOnboardingSteps()),
+        _repository = repository ?? UserRepository(),
+        _state = OnboardingState.initial(steps ?? buildDefaultOnboardingSteps());
 
-class OnboardingController extends StateNotifier<OnboardingState> {
-  OnboardingController(Ref ref)
-      : _ref = ref,
-        super(
-          OnboardingState.initial(
-            ref.read(onboardingStepsProvider),
-          ),
-        );
+  final List<OnboardingStep> _steps;
+  final UserRepository _repository;
 
-  final Ref _ref;
+  OnboardingState _state;
+  bool _disposed = false;
 
-  static const _completionMessage =
-      '¡Excelente! Dame un segundo para registrar todo y forjar tu plan personalizado.';
-
-  List<OnboardingStep> get steps => _ref.read(onboardingStepsProvider);
-  UserRepository get _repository => _ref.read(userRepositoryProvider);
+  OnboardingState get state => _state;
+  List<OnboardingStep> get steps => _steps;
 
   OnboardingStep get currentStep {
     final step = _currentStepOrNull;
@@ -152,13 +151,13 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     return step;
   }
 
-  bool get _hasSteps => steps.isNotEmpty;
+  bool get _hasSteps => _steps.isNotEmpty;
 
   int get _clampedStepIndex {
     if (!_hasSteps) {
       return 0;
     }
-    return state.stepIndex.clamp(0, steps.length - 1).toInt();
+    return _state.stepIndex.clamp(0, _steps.length - 1).toInt();
   }
 
   OnboardingStep? get _currentStepOrNull {
@@ -166,10 +165,16 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       return null;
     }
     final index = _clampedStepIndex;
-    if (index < 0 || index >= steps.length) {
+    if (index < 0 || index >= _steps.length) {
       return null;
     }
-    return steps[index];
+    return _steps[index];
+  }
+
+  void _updateState(OnboardingState newState) {
+    if (_disposed) return;
+    _state = newState;
+    notifyListeners();
   }
 
   String? _bridgeForStep(OnboardingStep step, Map<String, dynamic> answers) {
@@ -205,36 +210,36 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     }
   }
 
-  /// Avanza al siguiente paso del onboarding.
   void _advance() {
     if (!_hasSteps) {
-      if (!state.completed && mounted) {
-        state = state.copyWith(
-          completed: true,
-          coachIsTyping: false,
+      if (!_state.completed) {
+        _updateState(
+          _state.copyWith(
+            completed: true,
+            coachIsTyping: false,
+          ),
         );
       }
       return;
     }
 
-    final nextIndex = state.stepIndex + 1;
-    if (nextIndex < steps.length) {
-      final nextStep = steps[nextIndex];
-      if (!mounted) {
-        return;
-      }
-      state = state.copyWith(
-        stepIndex: nextIndex,
-        coachIsTyping: true,
-        multiSelection: const <String>{},
+    final nextIndex = _state.stepIndex + 1;
+    if (nextIndex < _steps.length) {
+      final nextStep = _steps[nextIndex];
+      _updateState(
+        _state.copyWith(
+          stepIndex: nextIndex,
+          coachIsTyping: true,
+          multiSelection: const <String>{},
+        ),
       );
 
       Future.delayed(const Duration(milliseconds: 520), () {
-        if (!mounted) {
+        if (_disposed) {
           return;
         }
 
-        final current = state;
+        final current = _state;
         if (current.stepIndex != nextIndex) {
           return;
         }
@@ -242,38 +247,38 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         final updatedEntries = [...current.entries];
         final bridge = _bridgeForStep(nextStep, current.answers);
         if (bridge != null && bridge.isNotEmpty) {
-          updatedEntries
-              .add(OnboardingChatEntry(text: bridge, fromCoach: true));
+          updatedEntries.add(
+            OnboardingChatEntry(text: bridge, fromCoach: true),
+          );
         }
-        updatedEntries
-            .add(OnboardingChatEntry(text: nextStep.prompt, fromCoach: true));
-        if (!mounted) {
-          return;
-        }
-        state = current.copyWith(
-          entries: updatedEntries,
-          coachIsTyping: false,
+        updatedEntries.add(
+          OnboardingChatEntry(text: nextStep.prompt, fromCoach: true),
+        );
+
+        _updateState(
+          current.copyWith(
+            entries: updatedEntries,
+            coachIsTyping: false,
+          ),
         );
       });
     } else {
-      if (!mounted) {
-        return;
-      }
-      state = state.copyWith(
-        completed: true,
-        coachIsTyping: false,
-        entries: [
-          ...state.entries,
-          const OnboardingChatEntry(
-            text: OnboardingController._completionMessage,
-            fromCoach: true,
-          ),
-        ],
+      _updateState(
+        _state.copyWith(
+          completed: true,
+          coachIsTyping: false,
+          entries: [
+            ..._state.entries,
+            const OnboardingChatEntry(
+              text: _completionMessage,
+              fromCoach: true,
+            ),
+          ],
+        ),
       );
     }
   }
 
-  /// Guarda una respuesta de texto y avanza.
   void submitText(String value) {
     final step = _currentStepOrNull;
     if (step == null) return;
@@ -281,34 +286,32 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return;
     final answers = {
-      ...state.answers,
+      ..._state.answers,
       step.id: trimmed,
     };
     final displayText = step.id == 'password' ? '••••••' : trimmed;
-    if (!mounted) {
-      return;
-    }
-    state = state.copyWith(
-      answers: Map.unmodifiable(answers),
-      entries: [
-        ...state.entries,
-        OnboardingChatEntry(text: displayText, fromCoach: false),
-      ],
+
+    _updateState(
+      _state.copyWith(
+        answers: Map.unmodifiable(answers),
+        entries: [
+          ..._state.entries,
+          OnboardingChatEntry(text: displayText, fromCoach: false),
+        ],
+      ),
     );
     _advance();
   }
 
-  /// Guarda una respuesta de opción única y avanza.
   void submitChoice(String choice) {
     final step = _currentStepOrNull;
     if (step == null) return;
 
     final answers = {
-      ...state.answers,
+      ..._state.answers,
       step.id: choice,
     };
 
-    // Mostrar el label amigable si existe.
     String label = choice;
     if (step.choiceLabels != null) {
       final idx = step.choices.indexOf(choice);
@@ -317,47 +320,46 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       }
     }
 
-    if (!mounted) {
-      return;
-    }
-    state = state.copyWith(
-      answers: Map.unmodifiable(answers),
-      entries: [
-        ...state.entries,
-        OnboardingChatEntry(text: label, fromCoach: false),
-      ],
+    _updateState(
+      _state.copyWith(
+        answers: Map.unmodifiable(answers),
+        entries: [
+          ..._state.entries,
+          OnboardingChatEntry(text: label, fromCoach: false),
+        ],
+      ),
     );
     _advance();
   }
 
-  /// Alterna una selección múltiple.
   void toggleMulti(String value) {
-    final selection = {...state.multiSelection};
+    final selection = {..._state.multiSelection};
     if (selection.contains(value)) {
       selection.remove(value);
     } else {
       selection.add(value);
     }
-    if (!mounted) {
-      return;
-    }
-    state = state.copyWith(multiSelection: Set.unmodifiable(selection));
+
+    _updateState(
+      _state.copyWith(
+        multiSelection: Set.unmodifiable(selection),
+      ),
+    );
   }
 
-  /// Confirma la selección múltiple actual.
   void confirmMulti() {
-    if (state.multiSelection.isEmpty) return;
+    if (_state.multiSelection.isEmpty) return;
     final step = _currentStepOrNull;
     if (step == null) return;
 
     final answers = {
-      ...state.answers,
-      step.id: state.multiSelection.toList(),
+      ..._state.answers,
+      step.id: _state.multiSelection.toList(),
     };
 
-    String labels = state.multiSelection.join(', ');
+    String labels = _state.multiSelection.join(', ');
     if (step.choiceLabels != null) {
-      labels = state.multiSelection
+      labels = _state.multiSelection
           .map((value) {
             final idx = step.choices.indexOf(value);
             if (idx >= 0 && idx < step.choiceLabels!.length) {
@@ -368,51 +370,46 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           .join(', ');
     }
 
-    if (!mounted) {
-      return;
-    }
-    state = state.copyWith(
-      answers: Map.unmodifiable(answers),
-      entries: [
-        ...state.entries,
-        OnboardingChatEntry(text: labels, fromCoach: false),
-      ],
-      multiSelection: const <String>{},
+    _updateState(
+      _state.copyWith(
+        answers: Map.unmodifiable(answers),
+        entries: [
+          ..._state.entries,
+          OnboardingChatEntry(text: labels, fromCoach: false),
+        ],
+        multiSelection: const <String>{},
+      ),
     );
     _advance();
   }
 
-  /// Confirma una opción numérica seleccionada.
   void submitNumeric(String value) {
     final step = _currentStepOrNull;
     if (step == null) return;
 
     final answers = {
-      ...state.answers,
+      ..._state.answers,
       step.id: value,
     };
-    final label = step.unit != null
-        ? '$value ${step.unit}'
-        : value;
+    final label = step.unit != null ? '$value ${step.unit}' : value;
 
-    if (!mounted) {
-      return;
-    }
-    state = state.copyWith(
-      answers: Map.unmodifiable(answers),
-      entries: [
-        ...state.entries,
-        OnboardingChatEntry(text: label, fromCoach: false),
-      ],
+    _updateState(
+      _state.copyWith(
+        answers: Map.unmodifiable(answers),
+        entries: [
+          ..._state.entries,
+          OnboardingChatEntry(text: label, fromCoach: false),
+        ],
+      ),
     );
     _advance();
   }
 
-  /// Guarda las respuestas en Firestore.
   Future<void> persist(User user) async {
-    if (!mounted || state.isSaving || !state.completed) return;
-    state = state.copyWith(isSaving: true);
-    final rawAnswers = Map<String, dynamic>.from(state.answers);
+    if (_disposed || _state.isSaving || !_state.completed) return;
+    _updateState(_state.copyWith(isSaving: true));
+
+    final rawAnswers = Map<String, dynamic>.from(_state.answers);
     final email = (rawAnswers['email'] as String?)?.trim();
     final password = (rawAnswers['password'] as String?)?.trim();
     final displayName = (rawAnswers['displayName'] as String?)?.trim();
@@ -421,11 +418,13 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     if (email != null) {
       sanitizedAnswers['email'] = email;
     }
+
     try {
       User workingUser = FirebaseAuth.instance.currentUser ?? user;
       if (displayName != null && displayName.isNotEmpty) {
         await workingUser.updateDisplayName(displayName);
       }
+
       if (workingUser.isAnonymous) {
         if (email != null && password != null && email.isNotEmpty) {
           final credential = EmailAuthProvider.credential(
@@ -449,24 +448,28 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         workingUser.uid,
         answers: sanitizedAnswers,
       );
-      if (!mounted) return;
-      state = state.copyWith(answers: Map.unmodifiable(sanitizedAnswers));
+
+      if (_disposed) return;
+      _updateState(
+        _state.copyWith(
+          answers: Map.unmodifiable(sanitizedAnswers),
+        ),
+      );
     } finally {
-      if (mounted) {
-        state = state.copyWith(isSaving: false);
+      if (!_disposed) {
+        _updateState(_state.copyWith(isSaving: false));
       }
     }
   }
 
-  /// Permite reabrir un paso específico para que el atleta corrija su respuesta.
   void reopenStep(String stepId, {String? coachMessage}) {
-    final targetIndex = steps.indexWhere((step) => step.id == stepId);
+    final targetIndex = _steps.indexWhere((step) => step.id == stepId);
     if (targetIndex == -1) return;
 
-    final prompt = steps[targetIndex].prompt;
+    final prompt = _steps[targetIndex].prompt;
     final updatedEntries = <OnboardingChatEntry>[];
     var promptFound = false;
-    for (final entry in state.entries) {
+    for (final entry in _state.entries) {
       if (!promptFound && entry.fromCoach && entry.text == prompt) {
         promptFound = true;
         break;
@@ -474,7 +477,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       updatedEntries.add(entry);
     }
 
-    if (state.completed &&
+    if (_state.completed &&
         updatedEntries.isNotEmpty &&
         updatedEntries.last.fromCoach &&
         updatedEntries.last.text == _completionMessage) {
@@ -482,27 +485,35 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     }
 
     if (coachMessage != null && coachMessage.isNotEmpty) {
-      updatedEntries
-          .add(OnboardingChatEntry(text: coachMessage, fromCoach: true));
+      updatedEntries.add(
+        OnboardingChatEntry(text: coachMessage, fromCoach: true),
+      );
     }
-    updatedEntries.add(OnboardingChatEntry(text: prompt, fromCoach: true));
+    updatedEntries.add(
+      OnboardingChatEntry(text: prompt, fromCoach: true),
+    );
 
-    final updatedAnswers = Map<String, dynamic>.from(state.answers)
+    final updatedAnswers = Map<String, dynamic>.from(_state.answers)
       ..removeWhere((key, _) {
-        final idx = steps.indexWhere((step) => step.id == key);
+        final idx = _steps.indexWhere((step) => step.id == key);
         return idx != -1 && idx >= targetIndex;
       });
 
-    if (!mounted) {
-      return;
-    }
-    state = state.copyWith(
-      entries: updatedEntries,
-      answers: Map.unmodifiable(updatedAnswers),
-      stepIndex: targetIndex,
-      completed: false,
-      coachIsTyping: false,
-      multiSelection: const <String>{},
+    _updateState(
+      _state.copyWith(
+        entries: updatedEntries,
+        answers: Map.unmodifiable(updatedAnswers),
+        stepIndex: targetIndex,
+        completed: false,
+        coachIsTyping: false,
+        multiSelection: const <String>{},
+      ),
     );
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
