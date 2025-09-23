@@ -29,7 +29,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         onDestinationSelected: (index) => _go(navItems[index].path),
         destinations: [
           for (final item in navItems)
-            NavigationDestination(icon: Icon(item.icon), label: item.label),
+            NavigationDestination(
+              icon: item.icon(false),
+              selectedIcon: item.icon(true),
+              label: item.label,
+            ),
         ],
       ),
     );
@@ -37,22 +41,39 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   List<_NavItem> _navItemsForRole(UserRole role) {
     final base = <_NavItem>[
-      const _NavItem(path: '/plan', icon: Icons.task_alt, label: 'Plan'),
-      const _NavItem(path: '/journal', icon: Icons.favorite, label: 'Diario'),
-      const _NavItem(
-        path: '/community',
-        icon: Icons.groups,
-        label: 'Comunidad',
+      _NavItem(
+        path: '/plan',
+        label: 'Plan',
+        iconBuilder: _simpleIcon(Icons.task_alt),
       ),
-      const _NavItem(path: '/profile', icon: Icons.person, label: 'Perfil'),
+      _NavItem(
+        path: '/journal',
+        label: 'Diario',
+        iconBuilder: _simpleIcon(Icons.favorite),
+      ),
+      _NavItem(
+        path: '/community',
+        label: 'Comunidad',
+        iconBuilder: _simpleIcon(Icons.groups),
+      ),
+      _NavItem(
+        path: '/prime',
+        label: 'PRIME Coloso',
+        iconBuilder: (selected) => _PrimeNavIcon(selected: selected),
+      ),
+      _NavItem(
+        path: '/profile',
+        label: 'Perfil',
+        iconBuilder: _simpleIcon(Icons.person),
+      ),
     ];
     if (role == UserRole.coach) {
       base.insert(
         2,
-        const _NavItem(
+        _NavItem(
           path: '/coach',
-          icon: Icons.support_agent,
           label: 'Coach',
+          iconBuilder: _simpleIcon(Icons.support_agent),
         ),
       );
     }
@@ -70,9 +91,61 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 }
 
 class _NavItem {
-  const _NavItem({required this.path, required this.icon, required this.label});
+  const _NavItem({
+    required this.path,
+    required this.iconBuilder,
+    required this.label,
+  });
 
   final String path;
-  final IconData icon;
+  final Widget Function(bool selected) iconBuilder;
   final String label;
+
+  Widget icon(bool selected) => iconBuilder(selected);
+}
+
+Widget Function(bool selected) _simpleIcon(IconData iconData) {
+  return (selected) => Icon(iconData);
+}
+
+class _PrimeNavIcon extends StatelessWidget {
+  const _PrimeNavIcon({required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final iconColor = selected ? colorScheme.primary : colorScheme.onSurfaceVariant;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(
+          selected ? Icons.workspace_premium : Icons.workspace_premium_outlined,
+          color: iconColor,
+        ),
+        Positioned(
+          top: -4,
+          right: -12,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'PRIME',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 8,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

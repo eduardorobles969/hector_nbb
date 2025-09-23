@@ -14,6 +14,7 @@ import 'features/onboarding/onboarding_screen.dart';
 import 'features/plan/plan_screen.dart';
 import 'features/profile/profile_providers.dart';
 import 'features/profile/profile_screen.dart';
+import 'features/prime/prime_screen.dart';
 import 'features/splash/splash_screen.dart';
 import 'features/welcome/welcome_screen.dart';
 
@@ -50,6 +51,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/community',
             builder: (_, __) => const CommunityScreen(),
           ),
+          GoRoute(path: '/prime', builder: (_, __) => const PrimeScreen()),
           GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
         ],
       ),
