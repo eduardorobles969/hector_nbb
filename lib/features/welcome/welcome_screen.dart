@@ -361,6 +361,21 @@ class _HeroSlideCard extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
+              Positioned(
+                top: 36,
+                bottom: 36,
+                left: -48,
+                child: _SideGlow(color: data.highlightColor),
+              ),
+              Positioned(
+                top: 36,
+                bottom: 36,
+                right: -48,
+                child: _SideGlow(
+                  color: data.highlightColor,
+                  mirrored: true,
+                ),
+              ),
               Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -453,18 +468,6 @@ class _HeroSlideCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Positioned(
-                top: -32,
-                left: 0,
-                right: 0,
-                child: _BrushStroke(top: true, color: data.strokeColor),
-              ),
-              Positioned(
-                bottom: -32,
-                left: 0,
-                right: 0,
-                child: _BrushStroke(top: false, color: data.strokeColor),
-              ),
             ],
           ),
         ),
@@ -473,86 +476,43 @@ class _HeroSlideCard extends StatelessWidget {
   }
 }
 
-class _BrushStroke extends StatelessWidget {
-  const _BrushStroke({required this.top, required this.color});
+class _SideGlow extends StatelessWidget {
+  const _SideGlow({required this.color, this.mirrored = false});
 
-  final bool top;
   final Color color;
+  final bool mirrored;
 
   @override
   Widget build(BuildContext context) {
-    return FractionallySizedBox(
-      widthFactor: 1.2,
-      alignment: Alignment.center,
-      child: Transform.translate(
-        offset: top ? const Offset(0, -22) : const Offset(0, 22),
-        child: SizedBox(
-          height: 64,
-          child: CustomPaint(
-            painter: _BrushStrokePainter(
-              color: color.withOpacity(0.65),
-              flipVertical: !top,
+    return IgnorePointer(
+      child: Transform.rotate(
+        angle: mirrored ? 0.32 : -0.32,
+        child: Container(
+          width: 160,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(120),
+            gradient: RadialGradient(
+              radius: 0.85,
+              center:
+                  mirrored ? Alignment.centerLeft : Alignment.centerRight,
+              colors: [
+                color.withOpacity(0.38),
+                color.withOpacity(0.14),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.55, 1.0],
             ),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.18),
+                blurRadius: 56,
+                spreadRadius: 6,
+              ),
+            ],
           ),
         ),
       ),
     );
-  }
-}
-
-class _BrushStrokePainter extends CustomPainter {
-  const _BrushStrokePainter({required this.color, required this.flipVertical});
-
-  final Color color;
-  final bool flipVertical;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    if (flipVertical) {
-      canvas.save();
-      canvas.translate(0, size.height);
-      canvas.scale(1, -1);
-    }
-
-    final path = Path()
-      ..moveTo(-32, size.height * 0.9)
-      ..quadraticBezierTo(
-        size.width * 0.15,
-        size.height * 0.25,
-        size.width * 0.32,
-        size.height * 0.6,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.55,
-        size.height * 1.05,
-        size.width * 0.74,
-        size.height * 0.4,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.92,
-        size.height * 0.05,
-        size.width + 32,
-        size.height * 0.7,
-      )
-      ..lineTo(size.width + 48, size.height + 24)
-      ..lineTo(-48, size.height + 24)
-      ..close();
-
-    canvas.drawPath(path, paint);
-
-    if (flipVertical) {
-      canvas.restore();
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _BrushStrokePainter oldDelegate) {
-    return oldDelegate.color != color ||
-        oldDelegate.flipVertical != flipVertical;
   }
 }
 
