@@ -67,7 +67,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final user = authState.asData?.value;
 
       if (user == null) {
-        if (isAuthRoute || isSplashRoute || isWelcomeRoute) {
+        if (isAuthRoute || isSplashRoute || isWelcomeRoute || isOnboardingRoute) {
           return null;
         }
         return '/welcome';

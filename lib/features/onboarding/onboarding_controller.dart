@@ -384,10 +384,11 @@ class OnboardingController extends ChangeNotifier {
     _advance();
   }
 
-  Future<void> persist(User user) async {
-    if (_disposed || _state.isSaving || !_state.completed) return;
+  Future<User?> persist(User? user) async {
+    if (_disposed || _state.isSaving || !_state.completed) return user;
     _updateState(_state.copyWith(isSaving: true));
 
+    final auth = FirebaseAuth.instance;
     final rawAnswers = Map<String, dynamic>.from(_state.answers);
     final email = (rawAnswers['email'] as String?)?.trim();
     final password = (rawAnswers['password'] as String?)?.trim();
@@ -401,16 +402,22 @@ class OnboardingController extends ChangeNotifier {
     }
 
     try {
-      var workingUser = FirebaseAuth.instance.currentUser ?? user;
+      var workingUser = user ?? auth.currentUser;
 
-      // 1) Actualiza displayName si viene
-      if (displayName != null && displayName.isNotEmpty) {
-        await workingUser.updateDisplayName(displayName);
-      }
-
-      // 2) Si el usuario es anónimo, hacemos "upgrade" linkeando email/password
-      if (workingUser.isAnonymous) {
-        if (email != null && password != null && email.isNotEmpty) {
+      if (workingUser == null) {
+        if (email == null || email.isEmpty || password == null || password.isEmpty) {
+          throw FirebaseAuthException(
+            code: 'missing-email',
+            message: 'Debes proporcionar un correo y una contraseña.',
+          );
+        }
+        final credential = await auth.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+        workingUser = credential.user;
+      } else if (workingUser.isAnonymous) {
+        if (email != null && email.isNotEmpty && password != null && password.isNotEmpty) {
           final credential = EmailAuthProvider.credential(
             email: email,
             password: password,
@@ -423,37 +430,50 @@ class OnboardingController extends ChangeNotifier {
             message: 'Debes proporcionar un correo y una contraseña.',
           );
         }
-      } else {
-        // 3) Si NO es anónimo y el email cambió, usar verifyBeforeUpdateEmail (firebase_auth v6)
-        if (email != null && email.isNotEmpty && workingUser.email != email) {
-          try {
-            await workingUser.verifyBeforeUpdateEmail(email);
-            // Marcamos que el cambio está pendiente hasta que el usuario confirme el email
-            sanitizedAnswers['pendingEmail'] = email;
+      } else if (email != null && email.isNotEmpty && workingUser.email != email) {
+        try {
+          await workingUser.verifyBeforeUpdateEmail(email);
+          // Marcamos que el cambio está pendiente hasta que el usuario confirme el email
+          sanitizedAnswers['pendingEmail'] = email;
 
-            // Mensaje en el chat para avisar la verificación
-            final updatedEntries = [
-              ..._state.entries,
-              const OnboardingChatEntry(
-                text:
-                    'Te envié un correo para confirmar tu nuevo email. Abre el enlace para completar el cambio.',
-                fromCoach: true,
-              ),
-            ];
-            _updateState(_state.copyWith(entries: updatedEntries));
-          } on FirebaseAuthException catch (e) {
-            if (e.code == 'requires-recent-login') {
-              // Reautenticación requerida para cambiar el correo (operación sensible)
-              throw FirebaseAuthException(
-                code: e.code,
-                message:
-                    'Por seguridad, vuelve a iniciar sesión para cambiar tu correo y vuelve a intentarlo.',
-              );
-            } else {
-              rethrow;
-            }
+          // Mensaje en el chat para avisar la verificación
+          final updatedEntries = [
+            ..._state.entries,
+            const OnboardingChatEntry(
+              text:
+                  'Te envié un correo para confirmar tu nuevo email. Abre el enlace para completar el cambio.',
+              fromCoach: true,
+            ),
+          ];
+          _updateState(_state.copyWith(entries: updatedEntries));
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'requires-recent-login') {
+            // Reautenticación requerida para cambiar el correo (operación sensible)
+            throw FirebaseAuthException(
+              code: e.code,
+              message:
+                  'Por seguridad, vuelve a iniciar sesión para cambiar tu correo y vuelve a intentarlo.',
+            );
+          } else {
+            rethrow;
           }
         }
+      }
+
+      workingUser ??= auth.currentUser;
+
+      if (displayName != null &&
+          displayName.isNotEmpty &&
+          workingUser != null &&
+          workingUser.displayName != displayName) {
+        await workingUser.updateDisplayName(displayName);
+      }
+
+      if (workingUser == null) {
+        throw FirebaseAuthException(
+          code: 'user-not-found',
+          message: 'No pudimos crear tu cuenta. Intenta de nuevo.',
+        );
       }
 
       // 4) Asegura el documento del usuario y guarda el intake del onboarding
@@ -463,10 +483,11 @@ class OnboardingController extends ChangeNotifier {
         answers: sanitizedAnswers,
       );
 
-      if (_disposed) return;
+      if (_disposed) return workingUser;
       _updateState(
         _state.copyWith(answers: Map.unmodifiable(sanitizedAnswers)),
       );
+      return workingUser;
     } finally {
       if (!_disposed) {
         _updateState(_state.copyWith(isSaving: false));

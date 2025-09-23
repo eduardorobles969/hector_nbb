@@ -72,7 +72,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _handleCompletion() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
 
     try {
       await _controller.persist(user);
@@ -126,6 +125,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return 'Vuelve a iniciar sesión para completar este paso.';
       case 'operation-not-allowed':
         return 'La creación de cuentas está deshabilitada. Contacta al administrador.';
+      case 'user-not-found':
+        return 'No pudimos crear tu cuenta. Intenta de nuevo.';
       default:
         return 'Algo no salió como esperábamos. Intenta de nuevo.';
     }

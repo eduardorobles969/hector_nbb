@@ -22,18 +22,17 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   Future<void> _startOnboarding() async {
     if (_isStarting) return;
     setState(() => _isStarting = true);
-    final auth = ref.read(firebaseAuthProvider);
 
     try {
+      final FirebaseAuth auth = ref.read(firebaseAuthProvider);
       final current = auth.currentUser;
-      if (current == null) {
-        await auth.signInAnonymously();
+
+      if (current != null && !current.isAnonymous) {
+        await current.reload();
       }
+
       if (!mounted) return;
       context.go('/onboarding');
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      _showError(_messageForCode(e.code));
     } catch (_) {
       if (!mounted) return;
       _showError('No pudimos iniciar el cuestionario. Intenta de nuevo.');
@@ -41,17 +40,6 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       if (mounted) {
         setState(() => _isStarting = false);
       }
-    }
-  }
-
-  String _messageForCode(String code) {
-    switch (code) {
-      case 'network-request-failed':
-        return 'Sin conexión. Verifica tu internet e intenta otra vez.';
-      case 'operation-not-allowed':
-        return 'La autenticación anónima no está disponible. Contacta al admin.';
-      default:
-        return 'Ocurrió un error al iniciar. Intenta de nuevo.';
     }
   }
 
