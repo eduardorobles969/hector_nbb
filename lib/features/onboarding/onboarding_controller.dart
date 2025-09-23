@@ -21,7 +21,7 @@ List<OnboardingStep> buildDefaultOnboardingSteps() {
     ),
     OnboardingStep(
       id: 'fitnessLevel',
-      prompt: 'Cuando entrenas hoy, ¿cómo describirías tu nivel?',
+      prompt: 'Cuando entrenas... ¿cómo describirías tu nivel?',
       type: OnboardingInputType.singleChoice,
       choices: ['novato', 'intermedio', 'avanzado'],
       choiceLabels: ['Novato', 'Intermedio', 'Avanzado'],
@@ -68,7 +68,7 @@ List<OnboardingStep> buildDefaultOnboardingSteps() {
     ),
     OnboardingStep(
       id: 'weightKg',
-      prompt: '¿Cuál es tu peso actual? Me ayuda a balancear el plan.',
+      prompt: 'Me ayudara a balancear el plan.',
       type: OnboardingInputType.numericChoice,
       choices: [
         '55',
@@ -94,7 +94,7 @@ List<OnboardingStep> buildDefaultOnboardingSteps() {
     ),
     OnboardingStep(
       id: 'pushups',
-      prompt: '¿Cuántas lagartijas seguidas te avientas?',
+      prompt: 'Seguidas y sin bajar las caderas!!, Sin mentiras coloso.',
       type: OnboardingInputType.singleChoice,
       choices: ['<20', '20-40', '40-60', '>60'],
     ),
@@ -106,7 +106,7 @@ List<OnboardingStep> buildDefaultOnboardingSteps() {
     ),
     OnboardingStep(
       id: 'dips',
-      prompt: '¿Cuántos fondos en paralelas completas dominas?',
+      prompt: 'En paralelas y completas',
       type: OnboardingInputType.singleChoice,
       choices: ['<10', '10-30', '30-50', '>50'],
     ),
@@ -405,7 +405,10 @@ class OnboardingController extends ChangeNotifier {
       var workingUser = user ?? auth.currentUser;
 
       if (workingUser == null) {
-        if (email == null || email.isEmpty || password == null || password.isEmpty) {
+        if (email == null ||
+            email.isEmpty ||
+            password == null ||
+            password.isEmpty) {
           throw FirebaseAuthException(
             code: 'missing-email',
             message: 'Debes proporcionar un correo y una contraseña.',
@@ -417,7 +420,10 @@ class OnboardingController extends ChangeNotifier {
         );
         workingUser = credential.user;
       } else if (workingUser.isAnonymous) {
-        if (email != null && email.isNotEmpty && password != null && password.isNotEmpty) {
+        if (email != null &&
+            email.isNotEmpty &&
+            password != null &&
+            password.isNotEmpty) {
           final credential = EmailAuthProvider.credential(
             email: email,
             password: password,
@@ -430,7 +436,9 @@ class OnboardingController extends ChangeNotifier {
             message: 'Debes proporcionar un correo y una contraseña.',
           );
         }
-      } else if (email != null && email.isNotEmpty && workingUser.email != email) {
+      } else if (email != null &&
+          email.isNotEmpty &&
+          workingUser.email != email) {
         try {
           await workingUser.verifyBeforeUpdateEmail(email);
           // Marcamos que el cambio está pendiente hasta que el usuario confirme el email

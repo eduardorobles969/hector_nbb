@@ -71,7 +71,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                 children: [
                   RichText(
                     text: TextSpan(
-                      text: 'Bienvenido a ',
+                      text: 'Bienvenido Coloso, ',
                       style: theme.textTheme.headlineMedium?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -80,9 +80,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                       children: const [
                         TextSpan(
                           text: 'Never Be Broken',
-                          style: TextStyle(
-                            color: Color(0xFFFF1744),
-                          ),
+                          style: TextStyle(color: Color(0xFFFF1744)),
                         ),
                       ],
                     ),
@@ -114,7 +112,10 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
                       side: BorderSide(color: Colors.white.withOpacity(0.7)),
-                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 12,
+                      ),
                       textStyle: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -133,16 +134,26 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.2,
-                                valueColor: AlwaysStoppedAnimation(Colors.white),
+                                valueColor: AlwaysStoppedAnimation(
+                                  Colors.white,
+                                ),
                               ),
                             )
-                          : const Icon(Icons.bolt_rounded, key: ValueKey('bolt')),
+                          : const Icon(
+                              Icons.bolt_rounded,
+                              key: ValueKey('bolt'),
+                            ),
                     ),
-                    label: Text(_isStarting ? 'CREANDO TU ESPACIO...' : 'EMPEZAR AHORA'),
+                    label: Text(
+                      _isStarting ? 'CREANDO TU ESPACIO...' : 'EMPEZAR AHORA',
+                    ),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFFF1744),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 18,
+                        horizontal: 16,
+                      ),
                       textStyle: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -202,10 +213,7 @@ class _WelcomeHero extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        Image.asset(
-                          'assets/HectorNBB.png',
-                          fit: BoxFit.cover,
-                        ),
+                        Image.asset('assets/HectorNBB.png', fit: BoxFit.cover),
                         DecoratedBox(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(

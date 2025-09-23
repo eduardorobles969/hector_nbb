@@ -115,7 +115,7 @@ class OnboardingState {
     final entries = <OnboardingChatEntry>[
       const OnboardingChatEntry(
         text:
-            '¡Hey! Soy Héctor, tu coach. Vamos a conversar para pulir un plan hecho a tu medida.',
+            '¡Hey! Coloso, Soy Héctor, tu coach. Vamos a conversar para pulir un plan hecho a tu medida.',
         fromCoach: true,
       ),
     ];
