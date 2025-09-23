@@ -371,10 +371,7 @@ class _HeroSlideCard extends StatelessWidget {
                 top: 36,
                 bottom: 36,
                 right: -48,
-                child: _SideGlow(
-                  color: data.highlightColor,
-                  mirrored: true,
-                ),
+                child: _SideGlow(color: data.highlightColor, mirrored: true),
               ),
               Positioned.fill(
                 child: DecoratedBox(
@@ -493,8 +490,7 @@ class _SideGlow extends StatelessWidget {
             borderRadius: BorderRadius.circular(120),
             gradient: RadialGradient(
               radius: 0.85,
-              center:
-                  mirrored ? Alignment.centerLeft : Alignment.centerRight,
+              center: mirrored ? Alignment.centerLeft : Alignment.centerRight,
               colors: [
                 color.withOpacity(0.38),
                 color.withOpacity(0.14),
