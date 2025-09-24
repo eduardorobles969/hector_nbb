@@ -138,10 +138,19 @@ class _CoachAssignmentsList extends ConsumerWidget {
 
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: userIds.length,
+      itemCount: userIds.length + 1,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (_, index) {
-        final uid = userIds[index];
+        if (index == 0) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Text(
+              'Estos son tus colosos PRIME activos. Abre cada chat para compartir planes, responder dudas y dejar notas sobre su progreso.',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          );
+        }
+        final uid = userIds[index - 1];
         return _MemberTile(
           uid: uid,
           leadingIcon: Icons.person,
@@ -171,10 +180,19 @@ class _PrimeCoachList extends ConsumerWidget {
 
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: coachIds.length,
+      itemCount: coachIds.length + 1,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (_, index) {
-        final uid = coachIds[index];
+        if (index == 0) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Text(
+              'Aquí verás a los coaches que llevan tu membresía. Puedes abrir el chat para compartir avances, dudas o solicitar ajustes en tus planes.',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          );
+        }
+        final uid = coachIds[index - 1];
         return _MemberTile(
           uid: uid,
           leadingIcon: Icons.support_agent,

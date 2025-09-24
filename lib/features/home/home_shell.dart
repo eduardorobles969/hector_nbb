@@ -14,15 +14,31 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
+  UserRole _lastKnownRole = UserRole.coloso;
+  bool _hasResolvedRole = false;
+
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
     final profileAsync = ref.watch(currentUserProfileProvider);
-    final role = profileAsync.asData?.value?.role ?? UserRole.coloso;
+    profileAsync.when(
+      data: (profile) {
+        _lastKnownRole = profile?.role ?? UserRole.coloso;
+        _hasResolvedRole = true;
+      },
+      loading: () {},
+      error: (_, __) {
+        _lastKnownRole = UserRole.coloso;
+        _hasResolvedRole = true;
+      },
+    );
+
+    final role = _lastKnownRole;
     final navItems = _navItemsForRole(role);
     final currentIndex = _indexFromLocation(location, navItems);
 
-    if ((role == UserRole.coach || role == UserRole.colosoPrime) &&
+    if (_hasResolvedRole &&
+        (role == UserRole.coach || role == UserRole.colosoPrime) &&
         location.startsWith('/prime')) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -30,7 +46,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       });
     }
 
-    if (role == UserRole.coloso && location.startsWith('/coach')) {
+    if (_hasResolvedRole &&
+        role == UserRole.coloso &&
+        location.startsWith('/coach')) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         context.go('/prime');
