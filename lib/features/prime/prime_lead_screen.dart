@@ -67,29 +67,35 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
     setState(() => _sending = true);
     try {
       final leadRef = _db.collection('prime_leads').doc(user.uid);
-      final leadSnap = await leadRef.get();
-      final isNewLead = leadSnap.exists != true;
 
-      final basePayload = {
+      final payload = {
         'uid': user.uid,
         'email': user.email ?? '',
         'name': _nameCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim(),
         'goal': _goalCtrl.text.trim(),
         'message': _messageCtrl.text.trim(),
-        'status': 'pending_coach_assignment',
         'source': 'app',
         'submittedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      await leadRef.set(
-        {
-          ...basePayload,
-          if (isNewLead) 'createdAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
+      try {
+        await leadRef.update(payload);
+      } on FirebaseException catch (e) {
+        if (e.code == 'not-found') {
+          await leadRef.set(
+            {
+              ...payload,
+              'status': 'pending_coach_assignment',
+              'createdAt': FieldValue.serverTimestamp(),
+            },
+            SetOptions(merge: true),
+          );
+        } else {
+          rethrow;
+        }
+      }
 
       await _db.collection('users').doc(user.uid).set({
         'role': 'coloso_prime',
