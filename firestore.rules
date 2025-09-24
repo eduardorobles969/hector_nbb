@@ -17,6 +17,11 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
     }
 
+    function isThreadMember(threadId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/coach_threads/$(threadId)).data.members.hasAny([request.auth.uid]);
+    }
+
     function noDietFields(data) {
       return !data.keys().hasAny(['weight', 'calories', 'caloria', 'bmi', 'imc']);
     }
@@ -51,11 +56,20 @@ service cloud.firestore {
     }
 
     match /coach_threads/{threadId} {
-      allow read, write: if isSignedIn() && request.resource.data.members.hasAny([request.auth.uid]);
-    }
+      allow get: if isSignedIn() && resource.data.members.hasAny([request.auth.uid]);
+      allow list: if false;
+      allow create: if isSignedIn() && request.resource.data.members.hasAny([request.auth.uid]);
+      allow update: if isSignedIn() &&
+        resource.data.members.hasAny([request.auth.uid]) &&
+        request.resource.data.members.hasAny([request.auth.uid]);
+      allow delete: if false;
 
-    match /coach_threads/{threadId}/messages/{messageId} {
-      allow read, write: if isSignedIn() && resource.data.members.hasAny([request.auth.uid]);
+      match /messages/{messageId} {
+        allow get, list: if isThreadMember(threadId);
+        allow create: if isThreadMember(threadId) && request.resource.data.fromUid == request.auth.uid;
+        allow update: if isThreadMember(threadId) && resource.data.fromUid == request.resource.data.fromUid;
+        allow delete: if false;
+      }
     }
 
     match /ai_insights/{uid}/{insightId} {
@@ -94,8 +108,11 @@ service cloud.firestore {
     }
 
     match /prime_leads/{leadId} {
-      allow create: if isSignedIn();
-      allow read, update, delete: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.uid;
+      allow update: if isSignedIn() &&
+        resource.data.uid == request.auth.uid &&
+        request.resource.data.uid == resource.data.uid;
+      allow read, delete: if isAdmin();
     }
   }
 }

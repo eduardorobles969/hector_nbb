@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../data/models/user_role.dart';
 import '../profile/profile_providers.dart';
@@ -12,7 +13,8 @@ class CoachScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final myUid = ref.read(chatRepoProvider).myUid;
+    final chatRepo = ref.read(chatRepoProvider);
+    final myUid = chatRepo.myUid;
     final profileAsync = ref.watch(currentUserProfileProvider);
 
     return Scaffold(
@@ -20,93 +22,182 @@ class CoachScreen extends ConsumerWidget {
       body: profileAsync.when(
         data: (profile) {
           final role = profile?.role ?? UserRole.coloso;
+
           if (role == UserRole.coach) {
             final usersAsync = ref.watch(coachUsersProvider(myUid));
             return usersAsync.when(
-              data: (users) {
-                if (users.isEmpty) {
-                  return const _EmptyState(
-                    icon: Icons.pending_actions,
-                    title: 'Sin usuarios asignados',
-                    message:
-                        'Crea en Firestore: /assignments/{userUid}/coaches/{coachUid} para enlazar colosos.',
-                  );
-                }
-                return ListView.separated(
-                  itemCount: users.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (_, i) {
-                    final uid = users[i];
-                    return ListTile(
-                      leading: const CircleAvatar(child: Icon(Icons.person)),
-                      title: Text('Usuario $uid'),
-                      subtitle: const Text('Abrir chat 1:1'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(
-                            otherUid: uid,
-                            otherName: 'Usuario',
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
+              data: (users) => _CoachAssignmentsList(userIds: users),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (_, __) => const _ErrorState(
+                message: 'No pudimos cargar tus usuarios. Intenta nuevamente en unos minutos.',
+              ),
             );
           }
 
           if (role == UserRole.colosoPrime) {
             final coachesAsync = ref.watch(userCoachesProvider(myUid));
             return coachesAsync.when(
-              data: (coaches) {
-                if (coaches.isEmpty) {
-                  return const _EmptyState(
-                    icon: Icons.support_agent,
-                    title: 'Estamos vinculando a tu coach',
-                    message:
-                        'Tu membresía PRIME está activa, pero aún no asignamos un coach. Escríbenos para acelerar el emparejamiento.',
-                  );
-                }
-                return ListView.separated(
-                  itemCount: coaches.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (_, i) {
-                    final uid = coaches[i];
-                    return ListTile(
-                      leading: const CircleAvatar(child: Icon(Icons.support_agent)),
-                      title: Text('Coach $uid'),
-                      subtitle: const Text('Chatea con tu coach 1:1'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(
-                            otherUid: uid,
-                            otherName: 'Coach',
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
+              data: (coaches) => _PrimeCoachList(coachIds: coaches),
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (_, __) => const _ErrorState(
+                message: 'No pudimos cargar a tu coach asignado. Intenta nuevamente en unos minutos.',
+              ),
             );
           }
 
-          return const _EmptyState(
+          return _EmptyState(
             icon: Icons.lock,
             title: 'Acceso exclusivo PRIME',
             message:
                 'Suscríbete a PRIME COLOSO para hablar directamente con un coach y desbloquear tus planes personalizados.',
+            action: FilledButton(
+              onPressed: () => context.go('/prime'),
+              child: const Text('Conoce PRIME COLOSO'),
+            ),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (_, __) => const _ErrorState(
+          message: 'No pudimos cargar tu perfil. Intenta nuevamente.',
+        ),
+      ),
+    );
+  }
+}
+
+class _CoachAssignmentsList extends ConsumerWidget {
+  const _CoachAssignmentsList({required this.userIds});
+
+  final List<String> userIds;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (userIds.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.pending_actions,
+        title: 'Sin usuarios asignados',
+        message:
+            'Asigna colosos en Firestore en /assignments/{userUid}/coaches/{coachUid} para comenzar el acompañamiento.',
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: userIds.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (_, index) {
+        final uid = userIds[index];
+        return _MemberTile(
+          uid: uid,
+          leadingIcon: Icons.person,
+          fallbackPrefix: 'Coloso',
+          subtitle: 'Abrir chat 1:1',
+        );
+      },
+    );
+  }
+}
+
+class _PrimeCoachList extends ConsumerWidget {
+  const _PrimeCoachList({required this.coachIds});
+
+  final List<String> coachIds;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (coachIds.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.support_agent,
+        title: 'Estamos vinculando a tu coach',
+        message:
+            'Tu membresía PRIME ya está activa. Apenas asignemos un coach aparecerá aquí para que puedas escribirle de inmediato.',
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: coachIds.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (_, index) {
+        final uid = coachIds[index];
+        return _MemberTile(
+          uid: uid,
+          leadingIcon: Icons.support_agent,
+          fallbackPrefix: 'Coach',
+          subtitle: 'Chatea con tu coach 1:1',
+        );
+      },
+    );
+  }
+}
+
+class _MemberTile extends ConsumerWidget {
+  const _MemberTile({
+    required this.uid,
+    required this.leadingIcon,
+    required this.fallbackPrefix,
+    required this.subtitle,
+  });
+
+  final String uid;
+  final IconData leadingIcon;
+  final String fallbackPrefix;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(userProfileProvider(uid));
+    final displayName = profileAsync.when(
+      data: (profile) {
+        final rawName = profile?.displayName;
+        final name = rawName?.trim();
+        if (name != null && name.isNotEmpty) {
+          return name;
+        }
+        return _fallbackName(uid, fallbackPrefix);
+      },
+      loading: () => _fallbackName(uid, fallbackPrefix),
+      error: (_, __) => _fallbackName(uid, fallbackPrefix),
+    );
+
+    final subtitleText = profileAsync.when(
+      data: (_) => subtitle,
+      loading: () => 'Cargando información...',
+      error: (_, __) => 'No pudimos cargar los detalles, pero puedes abrir el chat.',
+    );
+
+    return ListTile(
+      leading: CircleAvatar(child: Icon(leadingIcon)),
+      title: Text(displayName),
+      subtitle: Text(subtitleText),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            otherUid: uid,
+            otherName: displayName,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
       ),
     );
   }
@@ -117,11 +208,13 @@ class _EmptyState extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.message,
+    this.action,
   });
 
   final IconData icon;
   final String title;
   final String message;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -150,9 +243,19 @@ class _EmptyState extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
+            if (action != null) ...[
+              const SizedBox(height: 18),
+              action!,
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+String _fallbackName(String uid, String prefix) {
+  if (uid.isEmpty) return prefix;
+  final shortId = uid.length <= 6 ? uid : '${uid.substring(0, 6)}…';
+  return '$prefix $shortId';
 }
