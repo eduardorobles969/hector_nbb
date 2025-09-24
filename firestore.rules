@@ -116,9 +116,7 @@ service cloud.firestore {
       allow update: if isSignedIn() &&
         request.auth.uid == leadId &&
         (!request.resource.data.keys().hasAny(['uid']) ||
-          request.resource.data.uid == request.auth.uid) &&
-        (!resource.data.keys().hasAny(['uid']) ||
-          resource.data.uid == request.auth.uid);
+          request.resource.data.uid == request.auth.uid);
 
       allow read, delete: if isAdmin();
     }
