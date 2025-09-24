@@ -83,14 +83,13 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      if (isNewLead) {
-        await leadRef.set({
+      await leadRef.set(
+        {
           ...basePayload,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        await leadRef.update(basePayload);
-      }
+          if (isNewLead) 'createdAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
 
       await _db.collection('users').doc(user.uid).set({
         'role': 'coloso_prime',
