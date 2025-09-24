@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/user_role.dart';
+import '../auth/auth_providers.dart';
 import '../profile/profile_providers.dart';
 import 'assignments_providers.dart';
-import 'chat_providers.dart';
 import 'chat_screen.dart';
 
 class CoachScreen extends ConsumerWidget {
@@ -13,54 +13,109 @@ class CoachScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final chatRepo = ref.read(chatRepoProvider);
-    final myUid = chatRepo.myUid;
-    final profileAsync = ref.watch(currentUserProfileProvider);
+    final authAsync = ref.watch(authStateChangesProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Coach')),
-      body: profileAsync.when(
-        data: (profile) {
-          final role = profile?.role ?? UserRole.coloso;
-
-          if (role == UserRole.coach) {
-            final usersAsync = ref.watch(coachUsersProvider(myUid));
-            return usersAsync.when(
-              data: (users) => _CoachAssignmentsList(userIds: users),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const _ErrorState(
-                message: 'No pudimos cargar tus usuarios. Intenta nuevamente en unos minutos.',
-              ),
-            );
-          }
-
-          if (role == UserRole.colosoPrime) {
-            final coachesAsync = ref.watch(userCoachesProvider(myUid));
-            return coachesAsync.when(
-              data: (coaches) => _PrimeCoachList(coachIds: coaches),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const _ErrorState(
-                message: 'No pudimos cargar a tu coach asignado. Intenta nuevamente en unos minutos.',
-              ),
-            );
-          }
-
-          return _EmptyState(
-            icon: Icons.lock,
-            title: 'Acceso exclusivo PRIME',
-            message:
-                'Suscríbete a PRIME COLOSO para hablar directamente con un coach y desbloquear tus planes personalizados.',
-            action: FilledButton(
-              onPressed: () => context.go('/prime'),
-              child: const Text('Conoce PRIME COLOSO'),
+    return authAsync.when(
+      data: (user) {
+        if (user == null) {
+          return const _ScaffoldedState(
+            child: _EmptyState(
+              icon: Icons.login,
+              title: 'Inicia sesión para continuar',
+              message: 'Necesitas una cuenta activa para hablar con un coach.',
             ),
           );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const _ErrorState(
-          message: 'No pudimos cargar tu perfil. Intenta nuevamente.',
+        }
+
+        final myUid = user.uid;
+        final profileAsync = ref.watch(currentUserProfileProvider);
+
+        return profileAsync.when(
+          data: (profile) {
+            final role = profile?.role ?? UserRole.coloso;
+
+            if (role == UserRole.coach) {
+              final usersAsync = ref.watch(coachUsersProvider(myUid));
+              return _ScaffoldedState(
+                child: usersAsync.when(
+                  data: (users) => _CoachAssignmentsList(userIds: users),
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (_, __) => const _ErrorState(
+                    message:
+                        'No pudimos cargar tus usuarios. Intenta nuevamente en unos minutos.',
+                  ),
+                ),
+              );
+            }
+
+            if (role == UserRole.colosoPrime) {
+              final coachesAsync = ref.watch(userCoachesProvider(myUid));
+              return _ScaffoldedState(
+                child: coachesAsync.when(
+                  data: (coaches) => _PrimeCoachList(coachIds: coaches),
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (_, __) => const _ErrorState(
+                    message:
+                        'No pudimos cargar a tu coach asignado. Intenta nuevamente en unos minutos.',
+                  ),
+                ),
+              );
+            }
+
+            return const _ScaffoldedState(
+              child: _EmptyState(
+                icon: Icons.lock,
+                title: 'Acceso exclusivo PRIME',
+                message:
+                    'Suscríbete a PRIME COLOSO para hablar directamente con un coach y desbloquear tus planes personalizados.',
+                action: _PrimeCtaButton(),
+              ),
+            );
+          },
+          loading: () => const _ScaffoldedState(
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (_, __) => const _ScaffoldedState(
+            child: _ErrorState(
+              message: 'No pudimos cargar tu perfil. Intenta nuevamente.',
+            ),
+          ),
+        );
+      },
+      loading: () => const _ScaffoldedState(
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => const _ScaffoldedState(
+        child: _ErrorState(
+          message: 'No pudimos validar tu sesión. Intenta nuevamente.',
         ),
       ),
+    );
+  }
+}
+
+class _ScaffoldedState extends StatelessWidget {
+  const _ScaffoldedState({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Coach')),
+      body: child,
+    );
+  }
+}
+
+class _PrimeCtaButton extends StatelessWidget {
+  const _PrimeCtaButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton(
+      onPressed: () => context.go('/prime'),
+      child: const Text('Conoce PRIME COLOSO'),
     );
   }
 }

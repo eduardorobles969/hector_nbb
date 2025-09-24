@@ -109,7 +109,13 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
       }
     } on FirebaseException catch (e) {
       if (!mounted) return;
-      _showError(e.message);
+      if (e.code == 'permission-denied') {
+        _showError(
+          'Tu sesión no tiene permisos para enviar la solicitud. Cierra y vuelve a iniciar sesión para intentarlo de nuevo.',
+        );
+      } else {
+        _showError(e.message);
+      }
     } catch (_) {
       if (!mounted) return;
       _showError(null);
