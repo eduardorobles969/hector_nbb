@@ -40,7 +40,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   }
 
   List<_NavItem> _navItemsForRole(UserRole role) {
-    final base = <_NavItem>[
+    final items = <_NavItem>[
       _NavItem(
         path: '/plan',
         label: 'Plan',
@@ -61,14 +61,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         label: 'Perfil',
         iconBuilder: _simpleIcon(Icons.person),
       ),
-      _NavItem(
-        path: '/prime',
-        label: 'Plan',
-        iconBuilder: (selected) => _PrimeNavIcon(selected: selected),
-      ),
     ];
-    if (role == UserRole.coach) {
-      base.insert(
+
+    if (role == UserRole.coach || role == UserRole.colosoPrime) {
+      items.insert(
         2,
         _NavItem(
           path: '/coach',
@@ -77,7 +73,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         ),
       );
     }
-    return base;
+
+    if (role == UserRole.coloso) {
+      items.add(
+        _NavItem(
+          path: '/prime',
+          label: 'Plan',
+          iconBuilder: (selected) => _PrimeNavIcon(selected: selected),
+        ),
+      );
+    }
+
+    return items;
   }
 
   int _indexFromLocation(String loc, List<_NavItem> items) {

@@ -92,5 +92,10 @@ service cloud.firestore {
     match /assignments/{uid}/coaches/{coachUid} {
       allow read, write: if isOwner(uid) || request.auth.uid == coachUid || isAdmin();
     }
+
+    match /prime_leads/{leadId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isAdmin();
+    }
   }
 }

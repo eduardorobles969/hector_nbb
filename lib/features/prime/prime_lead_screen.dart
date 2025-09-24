@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class PrimeLeadScreen extends StatefulWidget {
@@ -16,7 +18,26 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
     text: 'Quiero activar PRIME COLOSO lo antes posible.',
   );
 
+  final _auth = FirebaseAuth.instance;
+  final _db = FirebaseFirestore.instance;
+
   bool _sending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = _auth.currentUser;
+    if (user != null) {
+      final name = user.displayName;
+      if (name != null && name.isNotEmpty) {
+        _nameCtrl.text = name;
+      }
+      final phone = user.phoneNumber;
+      if (phone != null && phone.isNotEmpty) {
+        _phoneCtrl.text = phone;
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -31,34 +52,54 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+    FocusScope.of(context).unfocus();
     setState(() => _sending = true);
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    setState(() => _sending = false);
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF111111),
-        title: const Text(
-          'Solicitud enviada',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-        ),
-        content: const Text(
-          'Tu coach recibirá esta información para continuar el cierre de tu acceso PRIME COLOSO. En breve te contactaremos '
-          'para finalizar el pago y activar tus beneficios.',
-          style: TextStyle(color: Colors.white70, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            style: TextButton.styleFrom(foregroundColor: Colors.white),
-            child: const Text('Entendido'),
+    try {
+      final user = _auth.currentUser;
+      await _db.collection('prime_leads').add({
+        'uid': user?.uid,
+        'email': user?.email,
+        'name': _nameCtrl.text.trim(),
+        'phone': _phoneCtrl.text.trim(),
+        'goal': _goalCtrl.text.trim(),
+        'message': _messageCtrl.text.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      if (!mounted) return;
+      setState(() => _sending = false);
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF111111),
+          title: const Text(
+            'Solicitud enviada',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
           ),
-        ],
-      ),
-    );
-    if (!mounted) return;
-    Navigator.of(context).pop();
+          content: const Text(
+            'Tu coach recibirá esta información para continuar el cierre de tu acceso PRIME COLOSO. En breve te contactaremos '
+            'para finalizar el pago y activar tus beneficios.',
+            style: TextStyle(color: Colors.white70, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _sending = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos enviar tu solicitud. Intenta nuevamente en unos minutos.'),
+        ),
+      );
+    }
   }
 
   InputDecoration _decoration(String label) {
