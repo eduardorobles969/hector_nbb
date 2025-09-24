@@ -22,6 +22,21 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final navItems = _navItemsForRole(role);
     final currentIndex = _indexFromLocation(location, navItems);
 
+    if ((role == UserRole.coach || role == UserRole.colosoPrime) &&
+        location.startsWith('/prime')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.go('/coach');
+      });
+    }
+
+    if (role == UserRole.coloso && location.startsWith('/coach')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.go('/prime');
+      });
+    }
+
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: NavigationBar(

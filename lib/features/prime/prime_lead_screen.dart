@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -69,8 +68,9 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
     try {
       final leadRef = _db.collection('prime_leads').doc(user.uid);
       final leadSnap = await leadRef.get();
-      final isNewLead = !leadSnap.exists;
-      final payload = {
+      final isNewLead = leadSnap.exists != true;
+
+      final basePayload = {
         'uid': user.uid,
         'email': user.email ?? '',
         'name': _nameCtrl.text.trim(),
@@ -81,10 +81,16 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
         'source': 'app',
         'submittedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
-        if (isNewLead) 'createdAt': FieldValue.serverTimestamp(),
       };
 
-      await leadRef.set(payload, SetOptions(merge: true));
+      if (isNewLead) {
+        await leadRef.set({
+          ...basePayload,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        await leadRef.update(basePayload);
+      }
 
       await _db.collection('users').doc(user.uid).set({
         'role': 'coloso_prime',

@@ -50,12 +50,14 @@ class UserProfile {
     if (data == null) {
       throw StateError('User profile missing for uid ');
     }
+    final primaryRole = _primaryRoleFromData(data);
+
     return UserProfile(
       uid: doc.id,
       email: (data['email'] ?? '') as String,
       displayName: (data['displayName'] ?? '') as String,
       photoUrl: (data['photoURL'] ?? '') as String,
-      role: UserRoleX.fromId((data['role'] ?? 'coloso') as String),
+      role: UserRoleX.fromId(primaryRole),
       active: (data['active'] ?? true) as bool,
       createdAt: _fromTimestamp(data['createdAt']),
       updatedAt: _fromTimestamp(data['updatedAt']),
@@ -76,5 +78,32 @@ class UserProfile {
   static DateTime? _fromTimestamp(dynamic value) {
     if (value is Timestamp) return value.toDate();
     return null;
+  }
+
+  static String _primaryRoleFromData(Map<String, dynamic> data) {
+    final rawRole = data['role'];
+    if (rawRole is String && rawRole.trim().isNotEmpty) {
+      return rawRole;
+    }
+
+    final rolesField = data['roles'];
+    if (rolesField is Iterable) {
+      final normalizedRoles = rolesField
+          .whereType<String>()
+          .map((role) => role.trim().toLowerCase())
+          .where((role) => role.isNotEmpty)
+          .toSet();
+
+      if (normalizedRoles.contains('coach')) {
+        return 'coach';
+      }
+      if (normalizedRoles.contains('coloso_prime') ||
+          normalizedRoles.contains('colosoprime') ||
+          normalizedRoles.contains('coloso-prime')) {
+        return 'coloso_prime';
+      }
+    }
+
+    return 'coloso';
   }
 }

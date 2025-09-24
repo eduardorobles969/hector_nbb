@@ -108,13 +108,10 @@ service cloud.firestore {
     }
 
     match /prime_leads/{leadId} {
-      allow create: if isSignedIn() &&
-        request.auth.uid == leadId;
-
-      allow update: if isSignedIn() &&
+      allow create, update: if isSignedIn() &&
         request.auth.uid == leadId &&
-        (!('uid' in resource.data) || resource.data.uid == request.auth.uid) &&
-        (!('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid);
+        (!('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid) &&
+        (!('uid' in resource.data) || resource.data.uid == request.auth.uid);
 
       allow read, delete: if isAdmin();
     }
