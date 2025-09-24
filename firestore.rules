@@ -109,13 +109,12 @@ service cloud.firestore {
 
     match /prime_leads/{leadId} {
       allow create: if isSignedIn() &&
-        request.auth.uid == leadId &&
-        request.resource.data.uid == request.auth.uid;
+        request.auth.uid == leadId;
 
       allow update: if isSignedIn() &&
         request.auth.uid == leadId &&
-        resource.data.uid == request.auth.uid &&
-        request.resource.data.uid == request.auth.uid;
+        (!('uid' in resource.data) || resource.data.uid == request.auth.uid) &&
+        (!('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid);
 
       allow read, delete: if isAdmin();
     }
