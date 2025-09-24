@@ -68,34 +68,31 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
     try {
       final leadRef = _db.collection('prime_leads').doc(user.uid);
 
-      final payload = {
-        'uid': user.uid,
-        'email': user.email ?? '',
-        'name': _nameCtrl.text.trim(),
-        'phone': _phoneCtrl.text.trim(),
-        'goal': _goalCtrl.text.trim(),
-        'message': _messageCtrl.text.trim(),
-        'source': 'app',
-        'submittedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
+      await _db.runTransaction((tx) async {
+        final snapshot = await tx.get(leadRef);
 
-      try {
-        await leadRef.update(payload);
-      } on FirebaseException catch (e) {
-        if (e.code == 'not-found') {
-          await leadRef.set(
-            {
-              ...payload,
-              'status': 'pending_coach_assignment',
-              'createdAt': FieldValue.serverTimestamp(),
-            },
-            SetOptions(merge: true),
-          );
+        final basePayload = <String, dynamic>{
+          'uid': user.uid,
+          'email': user.email ?? '',
+          'name': _nameCtrl.text.trim(),
+          'phone': _phoneCtrl.text.trim(),
+          'goal': _goalCtrl.text.trim(),
+          'message': _messageCtrl.text.trim(),
+          'source': 'app',
+          'submittedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+
+        if (snapshot.exists) {
+          tx.update(leadRef, basePayload);
         } else {
-          rethrow;
+          tx.set(leadRef, {
+            ...basePayload,
+            'status': 'pending_coach_assignment',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
         }
-      }
+      });
 
       await _db.collection('users').doc(user.uid).set({
         'role': 'coloso_prime',

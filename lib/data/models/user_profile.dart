@@ -81,29 +81,55 @@ class UserProfile {
   }
 
   static String _primaryRoleFromData(Map<String, dynamic> data) {
-    final rawRole = data['role'];
-    if (rawRole is String && rawRole.trim().isNotEmpty) {
+    final rawRole = (data['role'] as String?)?.trim().toLowerCase();
+    final normalizedRoles = _normalizedRoles(data['roles']);
+
+    if (_isCoach(rawRole, normalizedRoles)) {
+      return 'coach';
+    }
+
+    if (_isPrime(rawRole, normalizedRoles, data['primeStatus'])) {
+      return 'coloso_prime';
+    }
+
+    if (rawRole != null && rawRole.isNotEmpty) {
       return rawRole;
     }
 
-    final rolesField = data['roles'];
+    return 'coloso';
+  }
+
+  static Set<String> _normalizedRoles(dynamic rolesField) {
     if (rolesField is Iterable) {
-      final normalizedRoles = rolesField
+      return rolesField
           .whereType<String>()
           .map((role) => role.trim().toLowerCase())
           .where((role) => role.isNotEmpty)
           .toSet();
-
-      if (normalizedRoles.contains('coach')) {
-        return 'coach';
-      }
-      if (normalizedRoles.contains('coloso_prime') ||
-          normalizedRoles.contains('colosoprime') ||
-          normalizedRoles.contains('coloso-prime')) {
-        return 'coloso_prime';
-      }
     }
+    return <String>{};
+  }
 
-    return 'coloso';
+  static bool _isCoach(String? rawRole, Set<String> normalizedRoles) {
+    return rawRole == 'coach' || normalizedRoles.contains('coach');
+  }
+
+  static bool _isPrime(
+    String? rawRole,
+    Set<String> normalizedRoles,
+    dynamic primeStatusField,
+  ) {
+    if (rawRole == 'coloso_prime') {
+      return true;
+    }
+    if (normalizedRoles.contains('coloso_prime') ||
+        normalizedRoles.contains('colosoprime') ||
+        normalizedRoles.contains('coloso-prime')) {
+      return true;
+    }
+    if (primeStatusField is String && primeStatusField.isNotEmpty) {
+      return true;
+    }
+    return false;
   }
 }
