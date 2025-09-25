@@ -17,10 +17,37 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(uid));
     }
 
+    function roleVariants(role) {
+      let normalized = lower(role);
+      if (normalized == 'coach') {
+        return ['coach', 'Coach', 'COACH'];
+      }
+      if (normalized == 'coloso_prime') {
+        return [
+          'coloso_prime',
+          'coloso-prime',
+          'colosoprime',
+          'colosoPrime',
+          'coloso prime',
+          'Coloso_prime',
+          'Coloso-prime',
+          'ColosoPrime',
+          'Coloso Prime',
+          'COLOSO_PRIME',
+          'COLOSO-PRIME',
+          'COLOSOPRIME',
+        ];
+      }
+      if (normalized == 'admin') {
+        return ['admin', 'Admin', 'ADMIN'];
+      }
+      return [role, normalized, upper(role)];
+    }
+
     function hasRole(userDoc, role) {
       return userDoc.data != null && (
-        userDoc.data.role == role ||
-        (userDoc.data.roles != null && userDoc.data.roles.hasAny([role]))
+        (userDoc.data.role is string && lower(userDoc.data.role) == lower(role)) ||
+        (userDoc.data.roles is list && userDoc.data.roles.hasAny(roleVariants(role)))
       );
     }
 

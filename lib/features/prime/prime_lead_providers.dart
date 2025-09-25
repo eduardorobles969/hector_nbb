@@ -10,3 +10,7 @@ final primeLeadRepositoryProvider = Provider<PrimeLeadRepository>((ref) {
 final pendingPrimeLeadsProvider = StreamProvider<List<PrimeLead>>((ref) {
   return ref.watch(primeLeadRepositoryProvider).watchPendingLeads();
 });
+
+final primeLeadProvider = StreamProvider.family<PrimeLead?, String>((ref, uid) {
+  return ref.watch(primeLeadRepositoryProvider).watchLead(uid);
+});

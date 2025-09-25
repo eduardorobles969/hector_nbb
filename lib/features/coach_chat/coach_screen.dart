@@ -2,12 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../data/models/prime_lead.dart';
 import '../../data/models/user_role.dart';
 import '../auth/auth_providers.dart';
 import '../profile/profile_providers.dart';
 import '../prime/prime_lead_providers.dart';
+import '../prime/prime_lead_copy.dart';
 import 'assignments_providers.dart';
 import 'chat_screen.dart';
 
@@ -44,15 +46,40 @@ class CoachScreen extends ConsumerWidget {
             }
 
             if (role == UserRole.colosoPrime) {
+              final leadAsync = ref.watch(primeLeadProvider(myUid));
               final coachesAsync = ref.watch(userCoachesProvider(myUid));
-              return _ScaffoldedState(
-                child: coachesAsync.when(
-                  data: (coaches) => _PrimeCoachList(coachIds: coaches),
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (_, __) => const _ErrorState(
+
+              if (leadAsync.isLoading || coachesAsync.isLoading) {
+                return const _ScaffoldedState(
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (leadAsync.hasError) {
+                return const _ScaffoldedState(
+                  child: _ErrorState(
                     message:
-                        'No pudimos cargar a tu coach asignado. Intenta nuevamente en unos minutos.',
+                        'No pudimos cargar el estado de tu membresía PRIME. Actualiza la pantalla o intenta nuevamente en unos minutos.',
                   ),
+                );
+              }
+
+              if (coachesAsync.hasError) {
+                return const _ScaffoldedState(
+                  child: _ErrorState(
+                    message:
+                        'No pudimos cargar la lista de coaches asignados. Actualiza la pantalla o intenta nuevamente en unos minutos.',
+                  ),
+                );
+              }
+
+              final lead = leadAsync.valueOrNull;
+              final coachIds = coachesAsync.value ?? const <String>[];
+
+              return _ScaffoldedState(
+                child: _PrimeMemberDashboard(
+                  lead: lead,
+                  coachIds: coachIds,
                 ),
               );
             }
@@ -451,44 +478,172 @@ class _PendingLeadCardState extends ConsumerState<_PendingLeadCard> {
   }
 }
 
-class _PrimeCoachList extends ConsumerWidget {
-  const _PrimeCoachList({required this.coachIds});
+class _PrimeMemberDashboard extends StatelessWidget {
+  const _PrimeMemberDashboard({required this.lead, required this.coachIds});
 
+  final PrimeLead? lead;
   final List<String> coachIds;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (coachIds.isEmpty) {
-      return const _EmptyState(
-        icon: Icons.support_agent,
-        title: 'Estamos vinculando a tu coach',
-        message:
-            'Tu membresía PRIME ya está activa. Apenas asignemos un coach aparecerá aquí para que puedas escribirle de inmediato.',
-      );
-    }
+  Widget build(BuildContext context) {
+    final stage = lead?.stage ?? PrimeLeadStage.pendingAssignment;
+    final copy = primeLeadCopyForStage(stage);
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: coachIds.length + 1,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (_, index) {
-        if (index == 0) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Text(
-              'Aquí verás a los coaches que llevan tu membresía. Puedes abrir el chat para compartir avances, dudas o solicitar ajustes en tus planes.',
-              style: TextStyle(fontWeight: FontWeight.w600),
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      children: [
+        _PrimeStatusCard(lead: lead, copy: copy),
+        const SizedBox(height: 24),
+        Text(
+          'Tu equipo de coaches',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        if (coachIds.isEmpty)
+          _CoachInfoCard(
+            icon: stage == PrimeLeadStage.coachAssigned ? Icons.chat_bubble_outline : Icons.support_agent,
+            title: stage == PrimeLeadStage.coachAssigned
+                ? 'Estamos habilitando tu chat'
+                : 'Aún sin coach asignado',
+            message: copy.emptyCoachHint,
+          )
+        else
+          ...coachIds.map(
+            (uid) => Card(
+              margin: const EdgeInsets.symmetric(vertical: 6),
+              child: _MemberTile(
+                uid: uid,
+                leadingIcon: Icons.support_agent,
+                fallbackPrefix: 'Coach',
+                subtitle: 'Chatea con tu coach 1:1',
+              ),
             ),
-          );
-        }
-        final uid = coachIds[index - 1];
-        return _MemberTile(
-          uid: uid,
-          leadingIcon: Icons.support_agent,
-          fallbackPrefix: 'Coach',
-          subtitle: 'Chatea con tu coach 1:1',
-        );
-      },
+          ),
+        const SizedBox(height: 24),
+        OutlinedButton.icon(
+          onPressed: () => context.push('/prime/contact'),
+          icon: const Icon(Icons.edit_note),
+          label: const Text('Actualizar mis datos PRIME'),
+        ),
+      ],
+    );
+  }
+}
+
+class _PrimeStatusCard extends StatelessWidget {
+  const _PrimeStatusCard({required this.lead, required this.copy});
+
+  final PrimeLead? lead;
+  final PrimeLeadCopy copy;
+
+  @override
+  Widget build(BuildContext context) {
+    final stage = lead?.stage ?? PrimeLeadStage.pendingAssignment;
+    final badgeColor = primeLeadStatusColor(stage);
+    final leadData = lead;
+    final updatedAt = leadData?.updatedAt ?? leadData?.submittedAt ?? leadData?.createdAt;
+    final formattedDate = updatedAt != null
+        ? DateFormat('dd MMM yyyy · HH:mm', 'es').format(updatedAt.toLocal())
+        : null;
+
+    final theme = Theme.of(context);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _CoachStatusBadge(text: copy.badge, color: badgeColor),
+                if (formattedDate != null)
+                  Text(
+                    'Actualizado $formattedDate',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              copy.title,
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              copy.description,
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+            ),
+            if (leadData != null && leadData.goal.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Objetivo compartido',
+                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                leadData.goal,
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+              ),
+            ],
+            if (leadData != null && leadData.message.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Mensaje para el coach',
+                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                leadData.message,
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+              ),
+            ],
+            if (leadData == null) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Si necesitas compartir tus datos de nuevo abre la encuesta PRIME desde el botón inferior.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CoachStatusBadge extends StatelessWidget {
+  const _CoachStatusBadge({required this.text, required this.color});
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+          letterSpacing: 0.5,
+        ),
+      ),
     );
   }
 }

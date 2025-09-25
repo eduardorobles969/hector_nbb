@@ -1,16 +1,21 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
-class PrimeLeadScreen extends StatefulWidget {
+import '../../data/models/prime_lead.dart';
+import 'prime_lead_providers.dart';
+import 'prime_lead_copy.dart';
+
+class PrimeLeadScreen extends ConsumerStatefulWidget {
   const PrimeLeadScreen({super.key});
 
   @override
-  State<PrimeLeadScreen> createState() => _PrimeLeadScreenState();
+  ConsumerState<PrimeLeadScreen> createState() => _PrimeLeadScreenState();
 }
 
-class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
+class _PrimeLeadScreenState extends ConsumerState<PrimeLeadScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
@@ -20,9 +25,9 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
   );
 
   final _auth = FirebaseAuth.instance;
-  final _db = FirebaseFirestore.instance;
 
   bool _sending = false;
+  bool _prefilledFromLead = false;
 
   @override
   void initState() {
@@ -49,6 +54,27 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
     super.dispose();
   }
 
+  void _maybePrefillFromLead(PrimeLead? lead) {
+    if (lead == null || _prefilledFromLead) {
+      return;
+    }
+
+    if (_nameCtrl.text.trim().isEmpty && lead.name.isNotEmpty) {
+      _nameCtrl.text = lead.name;
+    }
+    if (_phoneCtrl.text.trim().isEmpty && lead.phone.isNotEmpty) {
+      _phoneCtrl.text = lead.phone;
+    }
+    if (_goalCtrl.text.trim().isEmpty && lead.goal.isNotEmpty) {
+      _goalCtrl.text = lead.goal;
+    }
+    if (_messageCtrl.text.trim().isEmpty && lead.message.isNotEmpty) {
+      _messageCtrl.text = lead.message;
+    }
+
+    _prefilledFromLead = true;
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -66,47 +92,21 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
     FocusScope.of(context).unfocus();
     setState(() => _sending = true);
     try {
-      final leadRef = _db.collection('prime_leads').doc(user.uid);
-
-      final existingSnap = await leadRef.get();
-      final existingData = existingSnap.data();
-      final existingStatus = (existingData?['status'] ?? '') as String?;
-      final hasCustomStatus =
-          existingStatus != null && existingStatus.isNotEmpty && existingStatus != 'pending_coach_assignment';
-      final nextStatus = hasCustomStatus ? existingStatus! : 'pending_coach_assignment';
-
-      final payload = <String, dynamic>{
-        'uid': user.uid,
-        'email': user.email ?? '',
-        'name': _nameCtrl.text.trim(),
-        'phone': _phoneCtrl.text.trim(),
-        'goal': _goalCtrl.text.trim(),
-        'message': _messageCtrl.text.trim(),
-        'source': 'app',
-        'status': nextStatus,
-        'submittedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-
-      if (!existingSnap.exists || existingData?['createdAt'] == null) {
-        payload['createdAt'] = FieldValue.serverTimestamp();
-      }
-
-      await leadRef.set(payload, SetOptions(merge: true));
-
-      await _db.collection('users').doc(user.uid).set({
-        'role': 'coloso_prime',
-        'roles': FieldValue.arrayUnion(['coloso_prime']),
-        'primeStatus': nextStatus,
-        'primeActivatedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      final repo = ref.read(primeLeadRepositoryProvider);
+      final status = await repo.submitLead(
+        uid: user.uid,
+        email: user.email ?? '',
+        name: _nameCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim(),
+        goal: _goalCtrl.text.trim(),
+        message: _messageCtrl.text.trim(),
+      );
 
       if (!mounted) return;
       final goToCoach = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => const _PrimeLeadSuccessDialog(),
+        builder: (ctx) => _PrimeLeadSuccessDialog(status: status),
       );
 
       if (!mounted) return;
@@ -163,6 +163,13 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final user = _auth.currentUser;
+    final leadAsync = user == null
+        ? AsyncValue<PrimeLead?>.data(null)
+        : ref.watch(primeLeadProvider(user.uid));
+    final lead = leadAsync.valueOrNull;
+
+    _maybePrefillFromLead(lead);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -191,6 +198,10 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
+                if (user != null) ...[
+                  _LeadStatusCard(state: leadAsync, lead: lead),
+                  const SizedBox(height: 24),
+                ],
                 TextFormField(
                   controller: _nameCtrl,
                   style: const TextStyle(color: Colors.white),
@@ -268,21 +279,265 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
   }
 }
 
-class _PrimeLeadSuccessDialog extends StatelessWidget {
-  const _PrimeLeadSuccessDialog();
+class _LeadStatusCard extends StatelessWidget {
+  const _LeadStatusCard({required this.state, required this.lead});
+
+  final AsyncValue<PrimeLead?> state;
+  final PrimeLead? lead;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (state.isLoading) {
+      return Card(
+        color: const Color(0xFF111111),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: const Padding(
+          padding: EdgeInsets.all(20),
+          child: Row(
+            children: [
+              SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  'Cargando el estado de tu solicitud PRIME…',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (state.hasError) {
+      return const _StatusInfoCard(
+        icon: Icons.error_outline,
+        title: 'No pudimos cargar tu solicitud',
+        message: 'Actualiza la app o vuelve a intentarlo en unos minutos.',
+      );
+    }
+
+    if (lead == null) {
+      final copy = primeLeadCopyForStage(PrimeLeadStage.pendingAssignment);
+      return _StatusInfoCard(
+        icon: Icons.support_agent,
+        title: copy.title,
+        message: copy.description,
+        badge: copy.badge,
+        stage: PrimeLeadStage.pendingAssignment,
+      );
+    }
+
+    final copy = primeLeadCopyForStage(lead.stage);
+    final statusColor = primeLeadStatusColor(lead.stage);
+    final updatedAt = lead.updatedAt ?? lead.submittedAt ?? lead.createdAt;
+    final formattedDate = updatedAt != null
+        ? DateFormat('dd MMM yyyy · HH:mm', 'es').format(updatedAt.toLocal())
+        : null;
+
+    return Card(
+      color: const Color(0xFF111111),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _StatusBadge(text: copy.badge, color: statusColor),
+                if (formattedDate != null) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Actualizado $formattedDate',
+                      style: theme.textTheme.labelSmall?.copyWith(color: Colors.white54),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              copy.title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              copy.description,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.white70,
+                height: 1.4,
+              ),
+            ),
+            if (lead.goal.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Objetivo principal',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                lead.goal,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white,
+                  height: 1.4,
+                ),
+              ),
+            ],
+            if (lead.message.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Mensaje para el coach',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                lead.message,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusInfoCard extends StatelessWidget {
+  const _StatusInfoCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.badge,
+    this.stage,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? badge;
+  final PrimeLeadStage? stage;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final badgeColor = stage != null ? primeLeadStatusColor(stage!) : Colors.white70;
+
+    return Card(
+      color: const Color(0xFF111111),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  backgroundColor: badgeColor.withOpacity(0.15),
+                  foregroundColor: badgeColor,
+                  child: Icon(icon),
+                ),
+                if (badge != null) ...[
+                  const SizedBox(width: 12),
+                  _StatusBadge(text: badge!, color: badgeColor),
+                ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.white70,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.text, required this.color});
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.6)),
+      ),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+}
+
+class _PrimeLeadSuccessDialog extends StatelessWidget {
+  const _PrimeLeadSuccessDialog({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final stage = _stageForStatus(status);
+    final copy = primeLeadCopyForStage(stage);
     return AlertDialog(
       backgroundColor: const Color(0xFF111111),
-      title: const Text(
-        'Solicitud enviada',
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+      title: Text(
+        primeLeadSuccessTitle(stage),
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
       ),
-      content: const Text(
-        'Activamos tu acceso PRIME y nuestro equipo asignará a tu coach. Ya puedes abrir la pestaña "Coach" para conversar en'
-        ' cuanto se vincule y revisar tus planes personalizados.',
-        style: TextStyle(color: Colors.white70, height: 1.4),
+      content: Text(
+        copy.successMessage,
+        style: const TextStyle(color: Colors.white70, height: 1.4),
       ),
       actions: [
         TextButton(
@@ -298,3 +553,4 @@ class _PrimeLeadSuccessDialog extends StatelessWidget {
     );
   }
 }
+

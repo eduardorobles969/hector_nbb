@@ -31,6 +31,8 @@ class PrimeLead {
   final DateTime? updatedAt;
   final DateTime? assignedAt;
 
+  PrimeLeadStage get stage => _stageForStatus(status);
+
   factory PrimeLead.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? const <String, dynamic>{};
     return PrimeLead(
@@ -53,5 +55,33 @@ class PrimeLead {
   static DateTime? _fromTimestamp(dynamic value) {
     if (value is Timestamp) return value.toDate();
     return null;
+  }
+}
+
+enum PrimeLeadStage {
+  pendingAssignment,
+  coachAssigned,
+  inProgress,
+  conversionComplete,
+  unknown,
+}
+
+PrimeLeadStage _stageForStatus(String status) {
+  switch (status) {
+    case 'pending_coach_assignment':
+      return PrimeLeadStage.pendingAssignment;
+    case 'coach_assigned':
+      return PrimeLeadStage.coachAssigned;
+    case 'converted':
+    case 'subscription_activated':
+      return PrimeLeadStage.conversionComplete;
+    case 'onboarding_call_scheduled':
+    case 'awaiting_payment':
+    case 'payment_pending':
+    case 'follow_up':
+    case 'contacted':
+      return PrimeLeadStage.inProgress;
+    default:
+      return PrimeLeadStage.unknown;
   }
 }
