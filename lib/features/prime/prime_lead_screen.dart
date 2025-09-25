@@ -68,6 +68,13 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
     try {
       final leadRef = _db.collection('prime_leads').doc(user.uid);
 
+      final existingSnap = await leadRef.get();
+      final existingData = existingSnap.data();
+      final existingStatus = (existingData?['status'] ?? '') as String?;
+      final hasCustomStatus =
+          existingStatus != null && existingStatus.isNotEmpty && existingStatus != 'pending_coach_assignment';
+      final nextStatus = hasCustomStatus ? existingStatus! : 'pending_coach_assignment';
+
       final payload = <String, dynamic>{
         'uid': user.uid,
         'email': user.email ?? '',
@@ -76,28 +83,21 @@ class _PrimeLeadScreenState extends State<PrimeLeadScreen> {
         'goal': _goalCtrl.text.trim(),
         'message': _messageCtrl.text.trim(),
         'source': 'app',
-        'status': 'pending_coach_assignment',
+        'status': nextStatus,
         'submittedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      try {
-        await leadRef.update(payload);
-      } on FirebaseException catch (e) {
-        if (e.code == 'not-found') {
-          await leadRef.set({
-            ...payload,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-        } else {
-          rethrow;
-        }
+      if (!existingSnap.exists || existingData?['createdAt'] == null) {
+        payload['createdAt'] = FieldValue.serverTimestamp();
       }
+
+      await leadRef.set(payload, SetOptions(merge: true));
 
       await _db.collection('users').doc(user.uid).set({
         'role': 'coloso_prime',
         'roles': FieldValue.arrayUnion(['coloso_prime']),
-        'primeStatus': 'pending_coach_assignment',
+        'primeStatus': nextStatus,
         'primeActivatedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));

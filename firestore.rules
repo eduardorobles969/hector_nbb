@@ -13,8 +13,27 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/assignments/$(uid)/coaches/$(request.auth.uid));
     }
 
+    function getUserDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function hasRole(userDoc, role) {
+      return userDoc.data != null && (
+        userDoc.data.role == role ||
+        (userDoc.data.roles != null && userDoc.data.roles.hasAny([role]))
+      );
+    }
+
     function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
+      return isSignedIn() && hasRole(getUserDoc(request.auth.uid), 'admin');
+    }
+
+    function isCoachRole(userDoc) {
+      return hasRole(userDoc, 'coach');
+    }
+
+    function isCoach() {
+      return isSignedIn() && isCoachRole(getUserDoc(request.auth.uid));
     }
 
     function isThreadMember(threadId) {
@@ -113,12 +132,16 @@ service cloud.firestore {
         (!request.resource.data.keys().hasAny(['uid']) ||
           request.resource.data.uid == request.auth.uid);
 
-      allow update: if isSignedIn() &&
-        request.auth.uid == leadId &&
-        (!request.resource.data.keys().hasAny(['uid']) ||
-          request.resource.data.uid == request.auth.uid);
+      allow update: if (
+          (isOwner(leadId) &&
+            (!request.resource.data.keys().hasAny(['uid']) || request.resource.data.uid == leadId)) ||
+          (isCoach() && (!request.resource.data.keys().hasAny(['uid']) || request.resource.data.uid == leadId)) ||
+          isAdmin()
+        );
 
-      allow read, delete: if isAdmin();
+      allow get: if isOwner(leadId) || isCoach() || isAdmin();
+      allow list: if isCoach() || isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }

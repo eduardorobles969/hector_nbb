@@ -1,10 +1,13 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/models/prime_lead.dart';
 import '../../data/models/user_role.dart';
 import '../auth/auth_providers.dart';
 import '../profile/profile_providers.dart';
+import '../prime/prime_lead_providers.dart';
 import 'assignments_providers.dart';
 import 'chat_screen.dart';
 
@@ -35,16 +38,8 @@ class CoachScreen extends ConsumerWidget {
             final role = profile?.role ?? UserRole.coloso;
 
             if (role == UserRole.coach) {
-              final usersAsync = ref.watch(coachUsersProvider(myUid));
               return _ScaffoldedState(
-                child: usersAsync.when(
-                  data: (users) => _CoachAssignmentsList(userIds: users),
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (_, __) => const _ErrorState(
-                    message:
-                        'No pudimos cargar tus usuarios. Intenta nuevamente en unos minutos.',
-                  ),
-                ),
+                child: _CoachDashboard(coachUid: myUid),
               );
             }
 
@@ -120,45 +115,339 @@ class _PrimeCtaButton extends StatelessWidget {
   }
 }
 
-class _CoachAssignmentsList extends ConsumerWidget {
-  const _CoachAssignmentsList({required this.userIds});
+class _CoachDashboard extends ConsumerWidget {
+  const _CoachDashboard({required this.coachUid});
 
-  final List<String> userIds;
+  final String coachUid;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (userIds.isEmpty) {
-      return const _EmptyState(
-        icon: Icons.pending_actions,
-        title: 'Sin usuarios asignados',
+    final pendingAsync = ref.watch(pendingPrimeLeadsProvider);
+    final assignedAsync = ref.watch(coachUsersProvider(coachUid));
+
+    if (pendingAsync.isLoading || assignedAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (pendingAsync.hasError) {
+      return const _ErrorState(
         message:
-            'Asigna colosos en Firestore en /assignments/{userUid}/coaches/{coachUid} para comenzar el acompañamiento.',
+            'No pudimos cargar las solicitudes PRIME. Actualiza la pantalla o intenta nuevamente en unos minutos.',
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: userIds.length + 1,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (_, index) {
-        if (index == 0) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Text(
-              'Estos son tus colosos PRIME activos. Abre cada chat para compartir planes, responder dudas y dejar notas sobre su progreso.',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-          );
-        }
-        final uid = userIds[index - 1];
-        return _MemberTile(
-          uid: uid,
-          leadingIcon: Icons.person,
-          fallbackPrefix: 'Coloso',
-          subtitle: 'Abrir chat 1:1',
-        );
-      },
+    if (assignedAsync.hasError) {
+      return const _ErrorState(
+        message:
+            'No pudimos cargar tus colosos asignados. Actualiza la pantalla o intenta nuevamente en unos minutos.',
+      );
+    }
+
+    final pending = pendingAsync.value ?? const <PrimeLead>[];
+    final assigned = assignedAsync.value ?? const <String>[];
+
+    return _CoachDashboardBody(
+      coachUid: coachUid,
+      pendingLeads: pending,
+      activeUserIds: assigned,
     );
+  }
+}
+
+class _CoachDashboardBody extends StatelessWidget {
+  const _CoachDashboardBody({
+    required this.coachUid,
+    required this.pendingLeads,
+    required this.activeUserIds,
+  });
+
+  final String coachUid;
+  final List<PrimeLead> pendingLeads;
+  final List<String> activeUserIds;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      children: [
+        const _SectionHeader(
+          icon: Icons.inbox,
+          title: 'Solicitudes PRIME pendientes',
+          subtitle:
+              'Revisa los datos del coloso y asígnate la cuenta para comenzar el acompañamiento.',
+        ),
+        const SizedBox(height: 8),
+        if (pendingLeads.isEmpty)
+          const _CoachInfoCard(
+            icon: Icons.hourglass_empty,
+            title: 'Sin solicitudes por ahora',
+            message:
+                'Cuando un coloso envíe la encuesta PRIME aparecerá aquí para que puedas tomarla.',
+          )
+        else
+          ...pendingLeads.map(
+            (lead) => _PendingLeadCard(
+              key: ValueKey('pending-lead-${lead.uid}-${lead.updatedAt}'),
+              coachUid: coachUid,
+              lead: lead,
+            ),
+          ),
+        const SizedBox(height: 24),
+        const _SectionHeader(
+          icon: Icons.support_agent,
+          title: 'Colosos PRIME activos',
+          subtitle:
+              'Ingresa al chat para compartir sus planes, resolver dudas y dejar notas de seguimiento.',
+        ),
+        const SizedBox(height: 8),
+        if (activeUserIds.isEmpty)
+          const _CoachInfoCard(
+            icon: Icons.pending_actions,
+            title: 'Aún sin colosos asignados',
+            message:
+                'Cuando tomes una solicitud PRIME se creará la relación y podrás escribirles desde aquí.',
+          )
+        else
+          ...activeUserIds.map(
+            (uid) => Card(
+              margin: const EdgeInsets.symmetric(vertical: 6),
+              child: _MemberTile(
+                uid: uid,
+                leadingIcon: Icons.person,
+                fallbackPrefix: 'Coloso',
+                subtitle: 'Abrir chat 1:1',
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: theme.colorScheme.primary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(height: 1.3),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CoachInfoCard extends StatelessWidget {
+  const _CoachInfoCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: theme.colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style:
+                        theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    message,
+                    style: theme.textTheme.bodySmall?.copyWith(height: 1.3),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PendingLeadCard extends ConsumerStatefulWidget {
+  const _PendingLeadCard({
+    super.key,
+    required this.coachUid,
+    required this.lead,
+  });
+
+  final String coachUid;
+  final PrimeLead lead;
+
+  @override
+  ConsumerState<_PendingLeadCard> createState() => _PendingLeadCardState();
+}
+
+class _PendingLeadCardState extends ConsumerState<_PendingLeadCard> {
+  bool _claiming = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final lead = widget.lead;
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  child: Text(
+                    lead.name.isNotEmpty
+                        ? lead.name.substring(0, 1).toUpperCase()
+                        : 'C',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        lead.name.isNotEmpty
+                            ? lead.name
+                            : _fallbackName(lead.uid, 'Coloso'),
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      if (lead.phone.isNotEmpty)
+                        Text(
+                          lead.phone,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      if (lead.email.isNotEmpty)
+                        Text(
+                          lead.email,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (lead.goal.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Objetivo principal',
+                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                lead.goal,
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+              ),
+            ],
+            if (lead.message.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Mensaje para el coach',
+                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                lead.message,
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                FilledButton.icon(
+                  onPressed: _claiming ? null : () => _claimLead(context),
+                  icon: const Icon(Icons.check),
+                  label: Text(_claiming ? 'Asignando…' : 'Asignarme'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _claimLead(BuildContext context) async {
+    setState(() => _claiming = true);
+    try {
+      await ref.read(primeLeadRepositoryProvider).claimLead(
+            leadUid: widget.lead.uid,
+            coachUid: widget.coachUid,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('¡Listo! El coloso fue asignado y ya puedes escribirle desde la sección activa.'),
+        ),
+      );
+    } on FirebaseException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? 'No se pudo asignar la solicitud.')),
+      );
+    } on StateError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? 'Esta solicitud ya fue tomada.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ocurrió un error al asignar la solicitud. Intenta de nuevo.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _claiming = false);
+      }
+    }
   }
 }
 
