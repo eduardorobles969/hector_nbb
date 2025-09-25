@@ -50,12 +50,14 @@ class UserProfile {
     if (data == null) {
       throw StateError('User profile missing for uid ');
     }
+    final primaryRole = _primaryRoleFromData(data);
+
     return UserProfile(
       uid: doc.id,
       email: (data['email'] ?? '') as String,
       displayName: (data['displayName'] ?? '') as String,
       photoUrl: (data['photoURL'] ?? '') as String,
-      role: UserRoleX.fromId((data['role'] ?? 'coloso') as String),
+      role: UserRoleX.fromId(primaryRole),
       active: (data['active'] ?? true) as bool,
       createdAt: _fromTimestamp(data['createdAt']),
       updatedAt: _fromTimestamp(data['updatedAt']),
@@ -76,5 +78,58 @@ class UserProfile {
   static DateTime? _fromTimestamp(dynamic value) {
     if (value is Timestamp) return value.toDate();
     return null;
+  }
+
+  static String _primaryRoleFromData(Map<String, dynamic> data) {
+    final rawRole = (data['role'] as String?)?.trim().toLowerCase();
+    final normalizedRoles = _normalizedRoles(data['roles']);
+
+    if (_isCoach(rawRole, normalizedRoles)) {
+      return 'coach';
+    }
+
+    if (_isPrime(rawRole, normalizedRoles, data['primeStatus'])) {
+      return 'coloso_prime';
+    }
+
+    if (rawRole != null && rawRole.isNotEmpty) {
+      return rawRole;
+    }
+
+    return 'coloso';
+  }
+
+  static Set<String> _normalizedRoles(dynamic rolesField) {
+    if (rolesField is Iterable) {
+      return rolesField
+          .whereType<String>()
+          .map((role) => role.trim().toLowerCase())
+          .where((role) => role.isNotEmpty)
+          .toSet();
+    }
+    return <String>{};
+  }
+
+  static bool _isCoach(String? rawRole, Set<String> normalizedRoles) {
+    return rawRole == 'coach' || normalizedRoles.contains('coach');
+  }
+
+  static bool _isPrime(
+    String? rawRole,
+    Set<String> normalizedRoles,
+    dynamic primeStatusField,
+  ) {
+    if (rawRole == 'coloso_prime') {
+      return true;
+    }
+    if (normalizedRoles.contains('coloso_prime') ||
+        normalizedRoles.contains('colosoprime') ||
+        normalizedRoles.contains('coloso-prime')) {
+      return true;
+    }
+    if (primeStatusField is String && primeStatusField.isNotEmpty) {
+      return true;
+    }
+    return false;
   }
 }

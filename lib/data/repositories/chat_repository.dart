@@ -49,7 +49,7 @@ class ChatRepository {
   /// Crea/retorna el ID del hilo entre el usuario actual y `otherUid`
   Future<String> ensureThread(String otherUid) async {
     final tid = buildThreadId(myUid, otherUid);
-    final ref = _db.collection('coachThreads').doc(tid);
+    final ref = _db.collection('coach_threads').doc(tid);
     final snap = await ref.get();
     if (!snap.exists) {
       await ref.set({
@@ -64,7 +64,7 @@ class ChatRepository {
   Stream<List<ChatMessage>> watchMessages(String otherUid, {int limit = 200}) {
     final tid = buildThreadId(myUid, otherUid);
     return _db
-        .collection('coachThreads')
+        .collection('coach_threads')
         .doc(tid)
         .collection('messages')
         .orderBy('sentAt', descending: true)
@@ -76,11 +76,12 @@ class ChatRepository {
   Future<void> sendText(String otherUid, String text) async {
     final tid = await ensureThread(otherUid);
     final msgRef = _db
-        .collection('coachThreads')
+        .collection('coach_threads')
         .doc(tid)
         .collection('messages')
         .doc();
     final now = DateTime.now();
+    final preview = text.length > 64 ? '${text.substring(0, 64)}…' : text;
 
     await _db.runTransaction((tx) async {
       tx.set(msgRef, {
@@ -90,9 +91,9 @@ class ChatRepository {
         'sentAt': Timestamp.fromDate(now),
         'readBy': [myUid],
       });
-      tx.update(_db.collection('coachThreads').doc(tid), {
+      tx.update(_db.collection('coach_threads').doc(tid), {
         'lastMessageAt': Timestamp.fromDate(now),
-        'lastMessagePreview': text.substring(0, text.length.clamp(0, 64)),
+        'lastMessagePreview': preview,
       });
     });
   }

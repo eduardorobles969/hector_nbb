@@ -13,8 +13,59 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/assignments/$(uid)/coaches/$(request.auth.uid));
     }
 
+    function getUserDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function roleVariants(role) {
+      let normalized = lower(role);
+      if (normalized == 'coach') {
+        return ['coach', 'Coach', 'COACH'];
+      }
+      if (normalized == 'coloso_prime') {
+        return [
+          'coloso_prime',
+          'coloso-prime',
+          'colosoprime',
+          'colosoPrime',
+          'coloso prime',
+          'Coloso_prime',
+          'Coloso-prime',
+          'ColosoPrime',
+          'Coloso Prime',
+          'COLOSO_PRIME',
+          'COLOSO-PRIME',
+          'COLOSOPRIME',
+        ];
+      }
+      if (normalized == 'admin') {
+        return ['admin', 'Admin', 'ADMIN'];
+      }
+      return [role, normalized, upper(role)];
+    }
+
+    function hasRole(userDoc, role) {
+      return userDoc.data != null && (
+        (userDoc.data.role is string && lower(userDoc.data.role) == lower(role)) ||
+        (userDoc.data.roles is list && userDoc.data.roles.hasAny(roleVariants(role)))
+      );
+    }
+
     function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin']);
+      return isSignedIn() && hasRole(getUserDoc(request.auth.uid), 'admin');
+    }
+
+    function isCoachRole(userDoc) {
+      return hasRole(userDoc, 'coach');
+    }
+
+    function isCoach() {
+      return isSignedIn() && isCoachRole(getUserDoc(request.auth.uid));
+    }
+
+    function isThreadMember(threadId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/coach_threads/$(threadId)).data.members.hasAny([request.auth.uid]);
     }
 
     function noDietFields(data) {
@@ -51,11 +102,20 @@ service cloud.firestore {
     }
 
     match /coach_threads/{threadId} {
-      allow read, write: if isSignedIn() && request.resource.data.members.hasAny([request.auth.uid]);
-    }
+      allow get: if isSignedIn() && resource.data.members.hasAny([request.auth.uid]);
+      allow list: if false;
+      allow create: if isSignedIn() && request.resource.data.members.hasAny([request.auth.uid]);
+      allow update: if isSignedIn() &&
+        resource.data.members.hasAny([request.auth.uid]) &&
+        request.resource.data.members.hasAny([request.auth.uid]);
+      allow delete: if false;
 
-    match /coach_threads/{threadId}/messages/{messageId} {
-      allow read, write: if isSignedIn() && resource.data.members.hasAny([request.auth.uid]);
+      match /messages/{messageId} {
+        allow get, list: if isThreadMember(threadId);
+        allow create: if isThreadMember(threadId) && request.resource.data.fromUid == request.auth.uid;
+        allow update: if isThreadMember(threadId) && resource.data.fromUid == request.resource.data.fromUid;
+        allow delete: if false;
+      }
     }
 
     match /ai_insights/{uid}/{insightId} {
@@ -91,6 +151,24 @@ service cloud.firestore {
 
     match /assignments/{uid}/coaches/{coachUid} {
       allow read, write: if isOwner(uid) || request.auth.uid == coachUid || isAdmin();
+    }
+
+    match /prime_leads/{leadId} {
+      allow create: if isSignedIn() &&
+        request.auth.uid == leadId &&
+        (!request.resource.data.keys().hasAny(['uid']) ||
+          request.resource.data.uid == request.auth.uid);
+
+      allow update: if (
+          (isOwner(leadId) &&
+            (!request.resource.data.keys().hasAny(['uid']) || request.resource.data.uid == leadId)) ||
+          (isCoach() && (!request.resource.data.keys().hasAny(['uid']) || request.resource.data.uid == leadId)) ||
+          isAdmin()
+        );
+
+      allow get: if isOwner(leadId) || isCoach() || isAdmin();
+      allow list: if isCoach() || isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }

@@ -22,3 +22,8 @@ final currentUserProfileProvider = StreamProvider<UserProfile?>((ref) {
     error: (_, __) => Stream<UserProfile?>.value(null),
   );
 });
+
+final userProfileProvider = StreamProvider.family<UserProfile?, String>((ref, uid) {
+  final repo = ref.watch(userRepositoryProvider);
+  return repo.watchProfile(uid);
+});

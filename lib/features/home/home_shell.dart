@@ -14,13 +14,46 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
+  UserRole _lastKnownRole = UserRole.coloso;
+  bool _hasResolvedRole = false;
+
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
     final profileAsync = ref.watch(currentUserProfileProvider);
-    final role = profileAsync.asData?.value?.role ?? UserRole.coloso;
+    profileAsync.when(
+      data: (profile) {
+        _lastKnownRole = profile?.role ?? UserRole.coloso;
+        _hasResolvedRole = true;
+      },
+      loading: () {},
+      error: (_, __) {
+        _lastKnownRole = UserRole.coloso;
+        _hasResolvedRole = true;
+      },
+    );
+
+    final role = _lastKnownRole;
     final navItems = _navItemsForRole(role);
     final currentIndex = _indexFromLocation(location, navItems);
+
+    if (_hasResolvedRole &&
+        (role == UserRole.coach || role == UserRole.colosoPrime) &&
+        location.startsWith('/prime')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.go('/coach');
+      });
+    }
+
+    if (_hasResolvedRole &&
+        role == UserRole.coloso &&
+        location.startsWith('/coach')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.go('/prime');
+      });
+    }
 
     return Scaffold(
       body: widget.child,
@@ -40,7 +73,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   }
 
   List<_NavItem> _navItemsForRole(UserRole role) {
-    final base = <_NavItem>[
+    final items = <_NavItem>[
       _NavItem(
         path: '/plan',
         label: 'Plan',
@@ -61,14 +94,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         label: 'Perfil',
         iconBuilder: _simpleIcon(Icons.person),
       ),
-      _NavItem(
-        path: '/prime',
-        label: 'Plan',
-        iconBuilder: (selected) => _PrimeNavIcon(selected: selected),
-      ),
     ];
-    if (role == UserRole.coach) {
-      base.insert(
+
+    if (role == UserRole.coach || role == UserRole.colosoPrime) {
+      items.insert(
         2,
         _NavItem(
           path: '/coach',
@@ -77,7 +106,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         ),
       );
     }
-    return base;
+
+    if (role == UserRole.coloso) {
+      items.add(
+        _NavItem(
+          path: '/prime',
+          label: 'Plan',
+          iconBuilder: (selected) => _PrimeNavIcon(selected: selected),
+        ),
+      );
+    }
+
+    return items;
   }
 
   int _indexFromLocation(String loc, List<_NavItem> items) {
