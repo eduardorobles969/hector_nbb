@@ -1,6 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -10,44 +11,46 @@ service cloud.firestore {
     }
 
     function isCoachFor(uid) {
-      return isSignedIn() && exists(/databases/$(database)/documents/assignments/$(uid)/coaches/$(request.auth.uid));
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/assignments/$(uid)/coaches/$(request.auth.uid));
     }
 
     function getUserDoc(uid) {
       return get(/databases/$(database)/documents/users/$(uid));
     }
 
+    // Helpers de listas (evita lower/upper)
+    function inList(v, list) {
+      return list.hasAny([v]);
+    }
+
     function roleVariants(role) {
-      let normalized = lower(role);
-      if (normalized == 'coach') {
-        return ['coach', 'Coach', 'COACH'];
-      }
-      if (normalized == 'coloso_prime') {
-        return [
-          'coloso_prime',
-          'coloso-prime',
-          'colosoprime',
-          'colosoPrime',
-          'coloso prime',
-          'Coloso_prime',
-          'Coloso-prime',
-          'ColosoPrime',
-          'Coloso Prime',
-          'COLOSO_PRIME',
-          'COLOSO-PRIME',
-          'COLOSOPRIME',
-        ];
-      }
-      if (normalized == 'admin') {
-        return ['admin', 'Admin', 'ADMIN'];
-      }
-      return [role, normalized, upper(role)];
+      let coach = ['coach','Coach','COACH'];
+      let admin = ['admin','Admin','ADMIN'];
+      let coloso = [
+        'coloso_prime','coloso-prime','colosoprime','colosoPrime','coloso prime',
+        'Coloso_prime','Coloso-prime','ColosoPrime','Coloso Prime',
+        'COLOSO_PRIME','COLOSO-PRIME','COLOSOPRIME'
+      ];
+
+      return inList(role, coach) ? coach
+           : inList(role, coloso) ? coloso
+           : inList(role, admin) ? admin
+           : [role]; // sin normalizar: devuelve tal cual
     }
 
     function hasRole(userDoc, role) {
       return userDoc.data != null && (
-        (userDoc.data.role is string && lower(userDoc.data.role) == lower(role)) ||
-        (userDoc.data.roles is list && userDoc.data.roles.hasAny(roleVariants(role)))
+        // Campo "role" como string
+        (userDoc.data.role is string &&
+          ( roleVariants(role).hasAny([userDoc.data.role]) ||
+            roleVariants(userDoc.data.role).hasAny([role]) )
+        )
+        ||
+        // Campo "roles" como lista
+        (userDoc.data.roles is list &&
+          userDoc.data.roles.hasAny(roleVariants(role))
+        )
       );
     }
 
@@ -65,16 +68,19 @@ service cloud.firestore {
 
     function isThreadMember(threadId) {
       return isSignedIn() &&
-        get(/databases/$(database)/documents/coach_threads/$(threadId)).data.members.hasAny([request.auth.uid]);
+        get(/databases/$(database)/documents/coach_threads/$(threadId))
+          .data.members.hasAny([request.auth.uid]);
     }
 
     function noDietFields(data) {
-      return !data.keys().hasAny(['weight', 'calories', 'caloria', 'bmi', 'imc']);
+      return !(data.keys().hasAny(['weight','calories','caloria','bmi','imc']));
     }
 
+    // ---------- MATCHES ----------
     match /users/{uid} {
       allow read: if isOwner(uid) || isCoachFor(uid) || isAdmin();
-      allow write: if isOwner(uid) && noDietFields(request.resource.data);
+      allow write: if (isOwner(uid) || isAdmin()) &&
+        noDietFields(request.resource.data);
     }
 
     match /profiles/{uid} {
@@ -86,9 +92,15 @@ service cloud.firestore {
       allow read, write: if isOwner(uid) || isCoachFor(uid) || isAdmin();
     }
 
+    match /plans/{uid} {
+      allow read: if isOwner(uid) || isCoachFor(uid) || isAdmin();
+      allow write: if isOwner(uid) || isAdmin();
+    }
+
     match /adaptive_plans/{uid} {
       allow read: if isOwner(uid) || isCoachFor(uid) || isAdmin();
-      allow write: if (isOwner(uid) || isCoachFor(uid) || isAdmin()) && noDietFields(request.resource.data);
+      allow write: if (isOwner(uid) || isCoachFor(uid) || isAdmin()) &&
+        noDietFields(request.resource.data);
     }
 
     match /journal/{uid}/entries/{entryId} {
@@ -112,27 +124,34 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow get, list: if isThreadMember(threadId);
-        allow create: if isThreadMember(threadId) && request.resource.data.fromUid == request.auth.uid;
-        allow update: if isThreadMember(threadId) && resource.data.fromUid == request.resource.data.fromUid;
+        allow create: if isThreadMember(threadId) &&
+          request.resource.data.fromUid == request.auth.uid;
+        allow update: if isThreadMember(threadId) &&
+          resource.data.fromUid == request.resource.data.fromUid;
         allow delete: if false;
       }
     }
 
-    match /ai_insights/{uid}/{insightId} {
+    // Nombre de subcolección explícito para mantener colección/documento/colección/documento
+    match /ai_insights/{uid}/insights/{insightId} {
       allow read: if isOwner(uid) || isCoachFor(uid) || isAdmin();
-      allow write: if (isCoachFor(uid) || isAdmin());
+      allow write: if isCoachFor(uid) || isAdmin();
     }
 
     match /community/posts/{postId} {
       allow read: if true;
       allow create: if isSignedIn() && noDietFields(request.resource.data);
-      allow update, delete: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.authorUid) && noDietFields(request.resource.data);
+      allow update, delete: if isSignedIn() &&
+        (isAdmin() || request.auth.uid == resource.data.authorUid) &&
+        noDietFields(request.resource.data);
     }
 
     match /community/posts/{postId}/comments/{commentId} {
       allow read: if true;
       allow create: if isSignedIn() && noDietFields(request.resource.data);
-      allow update, delete: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.authorUid) && noDietFields(request.resource.data);
+      allow update, delete: if isSignedIn() &&
+        (isAdmin() || request.auth.uid == resource.data.authorUid) &&
+        noDietFields(request.resource.data);
     }
 
     match /lessons/{lessonId} {
@@ -150,7 +169,8 @@ service cloud.firestore {
     }
 
     match /assignments/{uid}/coaches/{coachUid} {
-      allow read, write: if isOwner(uid) || request.auth.uid == coachUid || isAdmin();
+      allow read: if isOwner(uid) || request.auth.uid == coachUid || isAdmin();
+      allow write: if isAdmin();
     }
 
     match /prime_leads/{leadId} {
@@ -160,11 +180,14 @@ service cloud.firestore {
           request.resource.data.uid == request.auth.uid);
 
       allow update: if (
-          (isOwner(leadId) &&
-            (!request.resource.data.keys().hasAny(['uid']) || request.resource.data.uid == leadId)) ||
-          (isCoach() && (!request.resource.data.keys().hasAny(['uid']) || request.resource.data.uid == leadId)) ||
-          isAdmin()
-        );
+        (isOwner(leadId) &&
+          (!request.resource.data.keys().hasAny(['uid']) ||
+            request.resource.data.uid == leadId)) ||
+        (isCoach() &&
+          (!request.resource.data.keys().hasAny(['uid']) ||
+            request.resource.data.uid == leadId)) ||
+        isAdmin()
+      );
 
       allow get: if isOwner(leadId) || isCoach() || isAdmin();
       allow list: if isCoach() || isAdmin();

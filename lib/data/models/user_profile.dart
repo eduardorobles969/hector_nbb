@@ -88,6 +88,10 @@ class UserProfile {
       return 'coach';
     }
 
+    if (_isAdmin(rawRole, normalizedRoles)) {
+      return 'admin';
+    }
+
     if (_isPrime(rawRole, normalizedRoles, data['primeStatus'])) {
       return 'coloso_prime';
     }
@@ -131,5 +135,13 @@ class UserProfile {
       return true;
     }
     return false;
+  }
+
+  static bool _isAdmin(String? rawRole, Set<String> normalizedRoles) {
+    if (rawRole == 'admin') {
+      return true;
+    }
+    return normalizedRoles.contains('admin') ||
+        normalizedRoles.contains('administrator');
   }
 }

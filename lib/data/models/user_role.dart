@@ -1,4 +1,4 @@
-enum UserRole { coach, coloso, colosoPrime }
+enum UserRole { coach, coloso, colosoPrime, admin }
 
 extension UserRoleX on UserRole {
   String get id {
@@ -9,6 +9,8 @@ extension UserRoleX on UserRole {
         return 'coloso';
       case UserRole.colosoPrime:
         return 'coloso_prime';
+      case UserRole.admin:
+        return 'admin';
     }
   }
 
@@ -20,6 +22,8 @@ extension UserRoleX on UserRole {
         return 'Coloso';
       case UserRole.colosoPrime:
         return 'Coloso Prime';
+      case UserRole.admin:
+        return 'Administrador';
     }
   }
 
@@ -32,6 +36,9 @@ extension UserRoleX on UserRole {
       case 'coloso-prime':
       case 'colosoprime':
         return UserRole.colosoPrime;
+      case 'admin':
+      case 'administrator':
+        return UserRole.admin;
       case 'coloso':
       default:
         return UserRole.coloso;

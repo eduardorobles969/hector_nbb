@@ -66,6 +66,8 @@ enum PrimeLeadStage {
   unknown,
 }
 
+PrimeLeadStage primeLeadStageForStatus(String status) => _stageForStatus(status);
+
 PrimeLeadStage _stageForStatus(String status) {
   switch (status) {
     case 'pending_coach_assignment':

@@ -66,7 +66,9 @@ class PlanRepository {
       goals: _goalsForRole(role),
       today: _actionsForRole(role),
       updatedAt: now,
-      lastCoachReviewAt: role == UserRole.coach ? now : null,
+      lastCoachReviewAt: (role == UserRole.coach || role == UserRole.admin)
+          ? now
+          : null,
     );
   }
 
@@ -83,6 +85,12 @@ class PlanRepository {
           'Construir fuerza y movilidad sostenida',
           'Dominar rituales de respiracion y registro',
           'Refinar alimentacion segun senales internas',
+        ];
+      case UserRole.admin:
+        return [
+          'Reclutar y activar coaches de alto impacto',
+          'Supervisar el avance de colosos PRIME',
+          'Mantener operativos los rituales de la comunidad',
         ];
       case UserRole.coloso:
         return [
@@ -129,6 +137,24 @@ class PlanRepository {
             id: _uuid.v4(),
             title: 'Registrar victorias y obstaculos',
             note: 'Escribe 3 lineas en el diario antes de dormir',
+          ),
+        ];
+      case UserRole.admin:
+        return [
+          DailyAction(
+            id: _uuid.v4(),
+            title: 'Revisar pipeline de leads PRIME',
+            note: 'Verifica solicitudes pendientes y asignaciones',
+          ),
+          DailyAction(
+            id: _uuid.v4(),
+            title: 'Coordinar coaches activos',
+            note: 'Sincroniza disponibilidad y carga de cada coach',
+          ),
+          DailyAction(
+            id: _uuid.v4(),
+            title: 'Monitorear rituales comunitarios',
+            note: 'Asegura que los eventos clave sigan vigentes',
           ),
         ];
       case UserRole.coloso:

@@ -81,6 +81,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
+  void _startOnboarding() {
+    if (_isLoading) return;
+    FocusScope.of(context).unfocus();
+    context.go('/onboarding');
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -134,18 +140,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       const SizedBox(height: 28),
                       Text(
                         'Bienvenido de vuelta',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Inicia sesión para continuar forjando tu progreso. Si aún no tienes cuenta, toca "Empezar ahora" en la pantalla de bienvenida para crearla con el coach.',
+                        'Inicia sesión para continuar forjando tu progreso. Si aún no tienes cuenta, toca "Crear cuenta" para completar el cuestionario con el coach.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white70,
-                              height: 1.4,
-                            ),
+                          color: Colors.white70,
+                          height: 1.4,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 28),
@@ -156,6 +163,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         isLoading: _isLoading,
                         onSubmit: _submit,
                         onForgot: _sendReset,
+                        onCreateAccount: _startOnboarding,
                       ),
                       const SizedBox(height: 32),
                       const _CredoChips(),
@@ -339,6 +347,7 @@ class _AuthCard extends StatefulWidget {
     required this.isLoading,
     required this.onSubmit,
     required this.onForgot,
+    required this.onCreateAccount,
   });
 
   final GlobalKey<FormState> formKey;
@@ -347,6 +356,7 @@ class _AuthCard extends StatefulWidget {
   final bool isLoading;
   final VoidCallback onSubmit;
   final VoidCallback onForgot;
+  final VoidCallback onCreateAccount;
 
   @override
   State<_AuthCard> createState() => _AuthCardState();
@@ -444,6 +454,14 @@ class _AuthCardState extends State<_AuthCard> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Text('Entrar al cuartel'),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: widget.isLoading ? null : widget.onCreateAccount,
+              child: const Text(
+                'Crear cuenta',
+                style: TextStyle(color: Colors.white70),
+              ),
             ),
           ],
         ),

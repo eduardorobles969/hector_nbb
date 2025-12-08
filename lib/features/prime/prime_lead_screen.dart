@@ -167,7 +167,7 @@ class _PrimeLeadScreenState extends ConsumerState<PrimeLeadScreen> {
     final leadAsync = user == null
         ? AsyncValue<PrimeLead?>.data(null)
         : ref.watch(primeLeadProvider(user.uid));
-    final lead = leadAsync.valueOrNull;
+    final lead = leadAsync.asData?.value;
 
     _maybePrefillFromLead(lead);
 
@@ -326,7 +326,8 @@ class _LeadStatusCard extends StatelessWidget {
       );
     }
 
-    if (lead == null) {
+    final leadData = lead;
+    if (leadData == null) {
       final copy = primeLeadCopyForStage(PrimeLeadStage.pendingAssignment);
       return _StatusInfoCard(
         icon: Icons.support_agent,
@@ -337,9 +338,9 @@ class _LeadStatusCard extends StatelessWidget {
       );
     }
 
-    final copy = primeLeadCopyForStage(lead.stage);
-    final statusColor = primeLeadStatusColor(lead.stage);
-    final updatedAt = lead.updatedAt ?? lead.submittedAt ?? lead.createdAt;
+    final copy = primeLeadCopyForStage(leadData.stage);
+    final statusColor = primeLeadStatusColor(leadData.stage);
+    final updatedAt = leadData.updatedAt ?? leadData.submittedAt ?? leadData.createdAt;
     final formattedDate = updatedAt != null
         ? DateFormat('dd MMM yyyy · HH:mm', 'es').format(updatedAt.toLocal())
         : null;
@@ -384,7 +385,7 @@ class _LeadStatusCard extends StatelessWidget {
                 height: 1.4,
               ),
             ),
-            if (lead.goal.isNotEmpty) ...[
+            if (leadData.goal.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
                 'Objetivo principal',
@@ -395,14 +396,14 @@ class _LeadStatusCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                lead.goal,
+                leadData.goal,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: Colors.white,
                   height: 1.4,
                 ),
               ),
             ],
-            if (lead.message.isNotEmpty) ...[
+            if (leadData.message.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
                 'Mensaje para el coach',
@@ -413,7 +414,7 @@ class _LeadStatusCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                lead.message,
+                leadData.message,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: Colors.white,
                   height: 1.4,
@@ -527,7 +528,7 @@ class _PrimeLeadSuccessDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stage = _stageForStatus(status);
+    final stage = primeLeadStageForStatus(status);
     final copy = primeLeadCopyForStage(stage);
     return AlertDialog(
       backgroundColor: const Color(0xFF111111),

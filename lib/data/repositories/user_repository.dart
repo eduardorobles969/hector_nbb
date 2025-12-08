@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/user_profile.dart';
 import '../models/user_role.dart';
+import '../../config/app_roles.dart';
 
 class UserRepository {
   UserRepository();
@@ -39,23 +40,73 @@ class UserRepository {
       'lastSignInAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
+
+    final normalizedEmail = user.email?.trim().toLowerCase();
+    final forcedRole =
+        normalizedEmail != null && adminAccessEmails.contains(normalizedEmail)
+        ? UserRole.admin
+        : null;
+    final effectiveRole = forcedRole ?? defaultRole;
+    final effectiveRoleId = effectiveRole.id;
+
+    final existingData = snap.data();
+
+    final initialRoles = <String>{effectiveRoleId};
+    if (forcedRole == UserRole.admin) {
+      initialRoles.add('coach');
+    }
+
     if (!snap.exists) {
       await ref.set({
         ...baseData,
-        'role': defaultRole.id,
+        'role': effectiveRoleId,
+        'roles': initialRoles.toList(),
         'createdAt': FieldValue.serverTimestamp(),
         'onboardingComplete': false,
         'goals': <String>[],
+        'aiQuotaRemaining': effectiveRole == UserRole.coloso ? 3 : -1,
       });
-    } else {
-      await ref.set({
-        ...baseData,
-        'role': snap.data()?['role'] ?? defaultRole.id,
-        'createdAt': snap.data()?['createdAt'] ?? FieldValue.serverTimestamp(),
-        'onboardingComplete': snap.data()?['onboardingComplete'] ?? false,
-        'goals': snap.data()?['goals'] ?? <String>[],
-      }, SetOptions(merge: true));
+      return;
     }
+
+    var storedRoleId = (existingData?['role'] as String?)?.trim().toLowerCase();
+    if (storedRoleId == null || storedRoleId.isEmpty) {
+      storedRoleId = effectiveRoleId;
+    }
+    if (forcedRole != null) {
+      storedRoleId = forcedRole.id;
+    }
+
+    final rolesField = existingData?['roles'];
+    final storedRoles = <String>{};
+    if (rolesField is Iterable) {
+      for (final value in rolesField) {
+        if (value is String && value.isNotEmpty) {
+          storedRoles.add(value.trim().toLowerCase());
+        }
+      }
+    }
+    storedRoles.addAll(initialRoles);
+
+    final goalsField = existingData?['goals'];
+    final goalsList = goalsField is Iterable
+        ? goalsField.whereType<String>().toList()
+        : <String>[];
+
+    final aiQuota = existingData?['aiQuotaRemaining'];
+    final quotaValue = aiQuota is num
+        ? aiQuota.toInt()
+        : (storedRoleId == UserRole.coloso.id ? 3 : -1);
+
+    await ref.set({
+      ...baseData,
+      'role': storedRoleId,
+      'roles': storedRoles.toList(),
+      'createdAt': existingData?['createdAt'] ?? FieldValue.serverTimestamp(),
+      'onboardingComplete': existingData?['onboardingComplete'] ?? false,
+      'goals': goalsList,
+      'aiQuotaRemaining': quotaValue,
+    }, SetOptions(merge: true));
   }
 
   Future<UserRole> getRole(String uid) async {
@@ -69,6 +120,7 @@ class UserRepository {
   Future<void> updateRole(String uid, UserRole role) async {
     await _col.doc(uid).update({
       'role': role.id,
+      'roles': FieldValue.arrayUnion([role.id]),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }

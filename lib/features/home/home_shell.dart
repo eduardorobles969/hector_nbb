@@ -38,7 +38,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final currentIndex = _indexFromLocation(location, navItems);
 
     if (_hasResolvedRole &&
-        (role == UserRole.coach || role == UserRole.colosoPrime) &&
+        (role == UserRole.coach ||
+            role == UserRole.colosoPrime ||
+            role == UserRole.admin) &&
         location.startsWith('/prime')) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -96,7 +98,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ),
     ];
 
-    if (role == UserRole.coach || role == UserRole.colosoPrime) {
+    final hasCoachAccess =
+        role == UserRole.coach ||
+        role == UserRole.colosoPrime ||
+        role == UserRole.admin;
+
+    if (hasCoachAccess) {
       items.insert(
         2,
         _NavItem(
@@ -113,6 +120,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           path: '/prime',
           label: 'Plan',
           iconBuilder: (selected) => _PrimeNavIcon(selected: selected),
+        ),
+      );
+    }
+
+    if (role == UserRole.admin) {
+      items.insert(
+        0,
+        _NavItem(
+          path: '/admin',
+          label: 'Admin',
+          iconBuilder: _simpleIcon(Icons.dashboard_customize),
         ),
       );
     }

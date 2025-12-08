@@ -38,7 +38,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     final justCompleted =
         next.completed && !next.isSaving && previous.completed != true;
-    final shouldScroll = previous.entries.length != next.entries.length ||
+    final shouldScroll =
+        previous.entries.length != next.entries.length ||
         previous.coachIsTyping != next.coachIsTyping;
 
     if (!next.completed && previous.stepIndex != next.stepIndex) {
@@ -172,10 +173,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           child: Center(
             child: Text(
               'Aún no hay pasos configurados para tu onboarding.',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(color: Colors.white70),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: Colors.white70),
               textAlign: TextAlign.center,
             ),
           ),
@@ -245,7 +245,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             }
                             final entry = state.entries[index];
                             return _ChatBubble(
-                              key: ValueKey('${entry.fromCoach}-$index-${entry.text}'),
+                              key: ValueKey(
+                                '${entry.fromCoach}-$index-${entry.text}',
+                              ),
                               entry: entry,
                             );
                           },
@@ -329,11 +331,7 @@ class _OnboardingInputArea extends StatelessWidget {
       VoidCallback? onTap,
     }) {
       final display = label ?? value;
-      return _ChoicePill(
-        label: display,
-        selected: selected,
-        onTap: onTap,
-      );
+      return _ChoicePill(label: display, selected: selected, onTap: onTap);
     }
 
     Widget buildFreeText() {
@@ -360,7 +358,9 @@ class _OnboardingInputArea extends StatelessWidget {
             ..hideCurrentSnackBar()
             ..showSnackBar(
               const SnackBar(
-                content: Text('Tu contraseña debe tener al menos 6 caracteres.'),
+                content: Text(
+                  'Tu contraseña debe tener al menos 6 caracteres.',
+                ),
               ),
             );
           return;
@@ -408,20 +408,23 @@ class _OnboardingInputArea extends StatelessWidget {
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         hintText: step.hint ?? 'Comparte los detalles',
-                        hintStyle:
-                            const TextStyle(color: Colors.white54, fontSize: 14),
+                        hintStyle: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 14,
+                        ),
                         border: InputBorder.none,
                       ),
-                      keyboardType:
-                          isEmailStep ? TextInputType.emailAddress : TextInputType.text,
+                      keyboardType: isEmailStep
+                          ? TextInputType.emailAddress
+                          : TextInputType.text,
                       textCapitalization: isDisplayNameStep
                           ? TextCapitalization.words
                           : TextCapitalization.sentences,
                       autofillHints: isEmailStep
                           ? const [AutofillHints.email]
                           : isPasswordStep
-                              ? const [AutofillHints.newPassword]
-                              : null,
+                          ? const [AutofillHints.newPassword]
+                          : null,
                       obscureText: isPasswordStep,
                       enableSuggestions: !isPasswordStep,
                       autocorrect: !isPasswordStep,
@@ -514,7 +517,10 @@ class _OnboardingInputArea extends StatelessWidget {
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFFFB300),
                 foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 16,
+                ),
               ),
             ),
           ],
@@ -644,8 +650,11 @@ class _ChatHeader extends StatelessWidget {
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        const Icon(Icons.bolt_rounded,
-                            size: 16, color: Color(0xFFFFB300)),
+                        const Icon(
+                          Icons.bolt_rounded,
+                          size: 16,
+                          color: Color(0xFFFFB300),
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'Tu plan está tomando forma',
@@ -734,7 +743,9 @@ class _ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final alignment = entry.fromCoach ? Alignment.centerLeft : Alignment.centerRight;
+    final alignment = entry.fromCoach
+        ? Alignment.centerLeft
+        : Alignment.centerRight;
     final colors = entry.fromCoach
         ? [const Color(0xFF1F1F1F), const Color(0xFF141414)]
         : [const Color(0xFFFFB300), const Color(0xFFFF8F00)];
@@ -764,11 +775,7 @@ class _ChatBubble extends StatelessWidget {
           ),
           child: Text(
             entry.text,
-            style: TextStyle(
-              color: textColor,
-              fontSize: 16,
-              height: 1.32,
-            ),
+            style: TextStyle(color: textColor, fontSize: 16, height: 1.32),
           ),
         ),
       ),
@@ -835,10 +842,7 @@ class _CoachAvatar extends StatelessWidget {
       ),
       padding: const EdgeInsets.all(3),
       child: ClipOval(
-        child: Image.asset(
-          'assets/HectorNBB.png',
-          fit: BoxFit.cover,
-        ),
+        child: Image.asset('assets/HectorNBB.png', fit: BoxFit.cover),
       ),
     );
   }
@@ -857,7 +861,11 @@ class _UserAvatar extends StatelessWidget {
         border: Border.all(color: Colors.white24),
         color: const Color(0xFF1C1C1C),
       ),
-      child: const Icon(Icons.fitness_center_rounded, color: Colors.white70, size: 18),
+      child: const Icon(
+        Icons.fitness_center_rounded,
+        color: Colors.white70,
+        size: 18,
+      ),
     );
   }
 }

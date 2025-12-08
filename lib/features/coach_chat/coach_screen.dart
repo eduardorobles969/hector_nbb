@@ -26,7 +26,7 @@ class CoachScreen extends ConsumerWidget {
           return const _ScaffoldedState(
             child: _EmptyState(
               icon: Icons.login,
-              title: 'Inicia sesión para continuar',
+              title: 'Inicia sesiÃ³n para continuar',
               message: 'Necesitas una cuenta activa para hablar con un coach.',
             ),
           );
@@ -39,10 +39,8 @@ class CoachScreen extends ConsumerWidget {
           data: (profile) {
             final role = profile?.role ?? UserRole.coloso;
 
-            if (role == UserRole.coach) {
-              return _ScaffoldedState(
-                child: _CoachDashboard(coachUid: myUid),
-              );
+            if (role == UserRole.coach || role == UserRole.admin) {
+              return _ScaffoldedState(child: _CoachDashboard(coachUid: myUid));
             }
 
             if (role == UserRole.colosoPrime) {
@@ -59,7 +57,7 @@ class CoachScreen extends ConsumerWidget {
                 return const _ScaffoldedState(
                   child: _ErrorState(
                     message:
-                        'No pudimos cargar el estado de tu membresía PRIME. Actualiza la pantalla o intenta nuevamente en unos minutos.',
+                        'No pudimos cargar el estado de tu membresÃ­a PRIME. Actualiza la pantalla o intenta nuevamente en unos minutos.',
                   ),
                 );
               }
@@ -73,14 +71,11 @@ class CoachScreen extends ConsumerWidget {
                 );
               }
 
-              final lead = leadAsync.valueOrNull;
+              final lead = leadAsync.asData?.value;
               final coachIds = coachesAsync.value ?? const <String>[];
 
               return _ScaffoldedState(
-                child: _PrimeMemberDashboard(
-                  lead: lead,
-                  coachIds: coachIds,
-                ),
+                child: _PrimeMemberDashboard(lead: lead, coachIds: coachIds),
               );
             }
 
@@ -89,7 +84,7 @@ class CoachScreen extends ConsumerWidget {
                 icon: Icons.lock,
                 title: 'Acceso exclusivo PRIME',
                 message:
-                    'Suscríbete a PRIME COLOSO para hablar directamente con un coach y desbloquear tus planes personalizados.',
+                    'SuscrÃ­bete a PRIME COLOSO para hablar directamente con un coach y desbloquear tus planes personalizados.',
                 action: _PrimeCtaButton(),
               ),
             );
@@ -109,7 +104,7 @@ class CoachScreen extends ConsumerWidget {
       ),
       error: (_, __) => const _ScaffoldedState(
         child: _ErrorState(
-          message: 'No pudimos validar tu sesión. Intenta nuevamente.',
+          message: 'No pudimos validar tu sesiÃ³n. Intenta nuevamente.',
         ),
       ),
     );
@@ -201,7 +196,7 @@ class _CoachDashboardBody extends StatelessWidget {
           icon: Icons.inbox,
           title: 'Solicitudes PRIME pendientes',
           subtitle:
-              'Revisa los datos del coloso y asígnate la cuenta para comenzar el acompañamiento.',
+              'Revisa los datos del coloso y asÃ­gnate la cuenta para comenzar el acompaÃ±amiento.',
         ),
         const SizedBox(height: 8),
         if (pendingLeads.isEmpty)
@@ -209,7 +204,7 @@ class _CoachDashboardBody extends StatelessWidget {
             icon: Icons.hourglass_empty,
             title: 'Sin solicitudes por ahora',
             message:
-                'Cuando un coloso envíe la encuesta PRIME aparecerá aquí para que puedas tomarla.',
+                'Cuando un coloso envÃ­e la encuesta PRIME aparecerÃ¡ aquÃ­ para que puedas tomarla.',
           )
         else
           ...pendingLeads.map(
@@ -230,9 +225,9 @@ class _CoachDashboardBody extends StatelessWidget {
         if (activeUserIds.isEmpty)
           const _CoachInfoCard(
             icon: Icons.pending_actions,
-            title: 'Aún sin colosos asignados',
+            title: 'AÃºn sin colosos asignados',
             message:
-                'Cuando tomes una solicitud PRIME se creará la relación y podrás escribirles desde aquí.',
+                'Cuando tomes una solicitud PRIME se crearÃ¡ la relaciÃ³n y podrÃ¡s escribirles desde aquÃ­.',
           )
         else
           ...activeUserIds.map(
@@ -276,7 +271,9 @@ class _SectionHeader extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -320,8 +317,9 @@ class _CoachInfoCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style:
-                        theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -384,18 +382,14 @@ class _PendingLeadCardState extends ConsumerState<_PendingLeadCard> {
                         lead.name.isNotEmpty
                             ? lead.name
                             : _fallbackName(lead.uid, 'Coloso'),
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       if (lead.phone.isNotEmpty)
-                        Text(
-                          lead.phone,
-                          style: theme.textTheme.bodySmall,
-                        ),
+                        Text(lead.phone, style: theme.textTheme.bodySmall),
                       if (lead.email.isNotEmpty)
-                        Text(
-                          lead.email,
-                          style: theme.textTheme.bodySmall,
-                        ),
+                        Text(lead.email, style: theme.textTheme.bodySmall),
                     ],
                   ),
                 ),
@@ -405,7 +399,9 @@ class _PendingLeadCardState extends ConsumerState<_PendingLeadCard> {
               const SizedBox(height: 12),
               Text(
                 'Objetivo principal',
-                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -417,7 +413,9 @@ class _PendingLeadCardState extends ConsumerState<_PendingLeadCard> {
               const SizedBox(height: 12),
               Text(
                 'Mensaje para el coach',
-                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -432,7 +430,7 @@ class _PendingLeadCardState extends ConsumerState<_PendingLeadCard> {
                 FilledButton.icon(
                   onPressed: _claiming ? null : () => _claimLead(context),
                   icon: const Icon(Icons.check),
-                  label: Text(_claiming ? 'Asignando…' : 'Asignarme'),
+                  label: Text(_claiming ? 'Asignandoâ€¦' : 'Asignarme'),
                 ),
               ],
             ),
@@ -445,20 +443,23 @@ class _PendingLeadCardState extends ConsumerState<_PendingLeadCard> {
   Future<void> _claimLead(BuildContext context) async {
     setState(() => _claiming = true);
     try {
-      await ref.read(primeLeadRepositoryProvider).claimLead(
-            leadUid: widget.lead.uid,
-            coachUid: widget.coachUid,
-          );
+      await ref
+          .read(primeLeadRepositoryProvider)
+          .claimLead(leadUid: widget.lead.uid, coachUid: widget.coachUid);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('¡Listo! El coloso fue asignado y ya puedes escribirle desde la sección activa.'),
+          content: Text(
+            'Â¡Listo! El coloso fue asignado y ya puedes escribirle desde la secciÃ³n activa.',
+          ),
         ),
       );
     } on FirebaseException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? 'No se pudo asignar la solicitud.')),
+        SnackBar(
+          content: Text(e.message ?? 'No se pudo asignar la solicitud.'),
+        ),
       );
     } on StateError catch (e) {
       if (!mounted) return;
@@ -468,7 +469,11 @@ class _PendingLeadCardState extends ConsumerState<_PendingLeadCard> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ocurrió un error al asignar la solicitud. Intenta de nuevo.')),
+        const SnackBar(
+          content: Text(
+            'OcurriÃ³ un error al asignar la solicitud. Intenta de nuevo.',
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -496,15 +501,19 @@ class _PrimeMemberDashboard extends StatelessWidget {
         const SizedBox(height: 24),
         Text(
           'Tu equipo de coaches',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
         if (coachIds.isEmpty)
           _CoachInfoCard(
-            icon: stage == PrimeLeadStage.coachAssigned ? Icons.chat_bubble_outline : Icons.support_agent,
+            icon: stage == PrimeLeadStage.coachAssigned
+                ? Icons.chat_bubble_outline
+                : Icons.support_agent,
             title: stage == PrimeLeadStage.coachAssigned
                 ? 'Estamos habilitando tu chat'
-                : 'Aún sin coach asignado',
+                : 'AÃºn sin coach asignado',
             message: copy.emptyCoachHint,
           )
         else
@@ -541,9 +550,10 @@ class _PrimeStatusCard extends StatelessWidget {
     final stage = lead?.stage ?? PrimeLeadStage.pendingAssignment;
     final badgeColor = primeLeadStatusColor(stage);
     final leadData = lead;
-    final updatedAt = leadData?.updatedAt ?? leadData?.submittedAt ?? leadData?.createdAt;
+    final updatedAt =
+        leadData?.updatedAt ?? leadData?.submittedAt ?? leadData?.createdAt;
     final formattedDate = updatedAt != null
-        ? DateFormat('dd MMM yyyy · HH:mm', 'es').format(updatedAt.toLocal())
+        ? DateFormat('dd MMM yyyy Â· HH:mm', 'es').format(updatedAt.toLocal())
         : null;
 
     final theme = Theme.of(context);
@@ -573,7 +583,9 @@ class _PrimeStatusCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               copy.title,
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -584,7 +596,9 @@ class _PrimeStatusCard extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 'Objetivo compartido',
-                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -596,7 +610,9 @@ class _PrimeStatusCard extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 'Mensaje para el coach',
-                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -607,7 +623,7 @@ class _PrimeStatusCard extends StatelessWidget {
             if (leadData == null) ...[
               const SizedBox(height: 16),
               Text(
-                'Si necesitas compartir tus datos de nuevo abre la encuesta PRIME desde el botón inferior.',
+                'Si necesitas compartir tus datos de nuevo abre la encuesta PRIME desde el botÃ³n inferior.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.primary,
                   height: 1.4,
@@ -679,8 +695,9 @@ class _MemberTile extends ConsumerWidget {
 
     final subtitleText = profileAsync.when(
       data: (_) => subtitle,
-      loading: () => 'Cargando información...',
-      error: (_, __) => 'No pudimos cargar los detalles, pero puedes abrir el chat.',
+      loading: () => 'Cargando informaciÃ³n...',
+      error: (_, __) =>
+          'No pudimos cargar los detalles, pero puedes abrir el chat.',
     );
 
     return ListTile(
@@ -690,10 +707,7 @@ class _MemberTile extends ConsumerWidget {
       trailing: const Icon(Icons.chevron_right),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => ChatScreen(
-            otherUid: uid,
-            otherName: displayName,
-          ),
+          builder: (_) => ChatScreen(otherUid: uid, otherName: displayName),
         ),
       ),
     );
@@ -760,10 +774,7 @@ class _EmptyState extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            if (action != null) ...[
-              const SizedBox(height: 18),
-              action!,
-            ],
+            if (action != null) ...[const SizedBox(height: 18), action!],
           ],
         ),
       ),
@@ -773,6 +784,6 @@ class _EmptyState extends StatelessWidget {
 
 String _fallbackName(String uid, String prefix) {
   if (uid.isEmpty) return prefix;
-  final shortId = uid.length <= 6 ? uid : '${uid.substring(0, 6)}…';
+  final shortId = uid.length <= 6 ? uid : '${uid.substring(0, 6)}â€¦';
   return '$prefix $shortId';
 }
