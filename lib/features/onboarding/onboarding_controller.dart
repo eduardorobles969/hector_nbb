@@ -403,6 +403,7 @@ class OnboardingController extends ChangeNotifier {
 
     try {
       var workingUser = user ?? auth.currentUser;
+      var shouldSendVerification = false;
 
       if (workingUser == null) {
         if (email == null ||
@@ -419,6 +420,7 @@ class OnboardingController extends ChangeNotifier {
           password: password,
         );
         workingUser = credential.user;
+        shouldSendVerification = true;
       } else if (workingUser.isAnonymous) {
         if (email != null &&
             email.isNotEmpty &&
@@ -430,10 +432,11 @@ class OnboardingController extends ChangeNotifier {
           );
           final result = await workingUser.linkWithCredential(credential);
           workingUser = result.user ?? workingUser; // ya no es anónimo
+          shouldSendVerification = true;
         } else {
           throw FirebaseAuthException(
             code: 'missing-email',
-            message: 'Debes proporcionar un correo y una contraseña.',
+            message: 'Debes proporcionar un correo y una contrasena.',
           );
         }
       } else if (email != null &&
@@ -469,6 +472,17 @@ class OnboardingController extends ChangeNotifier {
       }
 
       workingUser ??= auth.currentUser;
+
+      if (workingUser != null &&
+          shouldSendVerification &&
+          workingUser.email != null &&
+          !workingUser.emailVerified) {
+        try {
+          await workingUser.sendEmailVerification();
+        } catch (_) {
+          // Ignore throttling/errors; UI will allow resending.
+        }
+      }
 
       if (displayName != null &&
           displayName.isNotEmpty &&

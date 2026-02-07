@@ -76,14 +76,27 @@ class _PrimeLeadScreenState extends ConsumerState<PrimeLeadScreen> {
   }
 
   Future<void> _submit() async {
+    final user = _auth.currentUser;
+    final lead = user == null
+        ? null
+        : ref.read(primeLeadProvider(user.uid)).asData?.value;
+
+    if (_isLeadLocked(lead)) {
+      _showError(
+        'Tu solicitud PRIME ya fue enviada y sigue en espera. Te avisaremos cuando un administrador te asigne coach.',
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    final user = _auth.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Necesitas iniciar sesión para solicitar tu acceso PRIME.'),
+          content: Text(
+            'Necesitas iniciar sesi\u00f3n para solicitar tu acceso PRIME.',
+          ),
         ),
       );
       return;
@@ -119,11 +132,14 @@ class _PrimeLeadScreenState extends ConsumerState<PrimeLeadScreen> {
       if (!mounted) return;
       if (e.code == 'permission-denied') {
         _showError(
-          'Tu sesión no tiene permisos para enviar la solicitud. Cierra y vuelve a iniciar sesión para intentarlo de nuevo.',
+          'Tu sesi\u00f3n no tiene permisos para enviar la solicitud. Cierra y vuelve a iniciar sesi\u00f3n para intentarlo de nuevo.',
         );
       } else {
         _showError(e.message);
       }
+    } on StateError catch (e) {
+      if (!mounted) return;
+      _showError(e.message);
     } catch (_) {
       if (!mounted) return;
       _showError(null);
@@ -138,15 +154,18 @@ class _PrimeLeadScreenState extends ConsumerState<PrimeLeadScreen> {
     final message = details == null || details.isEmpty
         ? 'No pudimos enviar tu solicitud. Intenta nuevamente en unos minutos.'
         : 'No pudimos enviar tu solicitud: $details';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   InputDecoration _decoration(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+      labelStyle: const TextStyle(
+        color: Colors.white70,
+        fontWeight: FontWeight.w600,
+      ),
       filled: true,
       fillColor: const Color(0xFF1B1B1B),
       enabledBorder: OutlineInputBorder(
@@ -168,6 +187,7 @@ class _PrimeLeadScreenState extends ConsumerState<PrimeLeadScreen> {
         ? AsyncValue<PrimeLead?>.data(null)
         : ref.watch(primeLeadProvider(user.uid));
     final lead = leadAsync.asData?.value;
+    final leadLocked = _isLeadLocked(lead);
 
     _maybePrefillFromLead(lead);
 
@@ -191,7 +211,7 @@ class _PrimeLeadScreenState extends ConsumerState<PrimeLeadScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Comparte tus datos y un coach iniciará el cierre de tu membresía PRIME COLOSO.',
+                  'Comparte tus datos y un coach iniciarÃ¡ el cierre de tu membresÃ­a PRIME COLOSO.',
                   style: textTheme.bodyLarge?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -202,31 +222,41 @@ class _PrimeLeadScreenState extends ConsumerState<PrimeLeadScreen> {
                   _LeadStatusCard(state: leadAsync, lead: lead),
                   const SizedBox(height: 24),
                 ],
+                if (leadLocked) ...[
+                  const _PrimeLeadLockedNotice(),
+                  const SizedBox(height: 18),
+                ],
                 TextFormField(
                   controller: _nameCtrl,
+                  enabled: !leadLocked,
                   style: const TextStyle(color: Colors.white),
                   decoration: _decoration('Nombre completo'),
-                  validator: (value) =>
-                      value == null || value.trim().isEmpty ? 'Ingresa tu nombre' : null,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Ingresa tu nombre'
+                      : null,
                 ),
                 const SizedBox(height: 18),
                 TextFormField(
                   controller: _phoneCtrl,
+                  enabled: !leadLocked,
                   style: const TextStyle(color: Colors.white),
-                  decoration: _decoration('WhatsApp o teléfono de contacto'),
+                  decoration: _decoration('WhatsApp o telÃ©fono de contacto'),
                   keyboardType: TextInputType.phone,
-                  validator: (value) =>
-                      value == null || value.trim().isEmpty ? 'Necesitamos un contacto' : null,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Necesitamos un contacto'
+                      : null,
                 ),
                 const SizedBox(height: 18),
                 TextFormField(
                   controller: _goalCtrl,
+                  enabled: !leadLocked,
                   style: const TextStyle(color: Colors.white),
-                  decoration: _decoration('¿Cuál es tu objetivo Coloso?'),
+                  decoration: _decoration('Â¿CuÃ¡l es tu objetivo Coloso?'),
                 ),
                 const SizedBox(height: 18),
                 TextFormField(
                   controller: _messageCtrl,
+                  enabled: !leadLocked,
                   style: const TextStyle(color: Colors.white),
                   decoration: _decoration('Mensaje para tu coach'),
                   maxLines: 5,
@@ -235,7 +265,7 @@ class _PrimeLeadScreenState extends ConsumerState<PrimeLeadScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _sending ? null : _submit,
+                    onPressed: _sending || leadLocked ? null : _submit,
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFD0202A),
                       padding: const EdgeInsets.symmetric(vertical: 18),
@@ -249,8 +279,9 @@ class _PrimeLeadScreenState extends ConsumerState<PrimeLeadScreen> {
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : const Text(
@@ -262,9 +293,21 @@ class _PrimeLeadScreenState extends ConsumerState<PrimeLeadScreen> {
                           ),
                   ),
                 ),
+                if (leadLocked &&
+                    lead?.stage == PrimeLeadStage.coachAssigned) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.go('/coach'),
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      label: const Text('Ir con mi coach'),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 Text(
-                  'Después de validar tu pago manualmente activaremos tu cuenta como PRIME COLOSO para que desbloquees todos los accesos.',
+                  'DespuÃ©s de validar tu pago manualmente activaremos tu cuenta como PRIME COLOSO para que desbloquees todos los accesos.',
                   style: textTheme.bodySmall?.copyWith(
                     color: Colors.white54,
                     height: 1.4,
@@ -273,6 +316,32 @@ class _PrimeLeadScreenState extends ConsumerState<PrimeLeadScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  bool _isLeadLocked(PrimeLead? lead) {
+    if (lead == null) return false;
+    final status = lead.status.trim().toLowerCase();
+    if (status.isEmpty) return false;
+    return status != 'rejected' && status != 'cancelled';
+  }
+}
+
+class _PrimeLeadLockedNotice extends StatelessWidget {
+  const _PrimeLeadLockedNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: const Color(0xFF111111),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: const Padding(
+        padding: EdgeInsets.all(16),
+        child: Text(
+          'Tu solicitud PRIME ya fue enviada y estÃ¡ en espera. No necesitas volver a enviarla; te avisaremos cuando el administrador asigne tu coach.',
+          style: TextStyle(color: Colors.white70, height: 1.35),
         ),
       ),
     );
@@ -308,7 +377,7 @@ class _LeadStatusCard extends StatelessWidget {
               SizedBox(width: 16),
               Expanded(
                 child: Text(
-                  'Cargando el estado de tu solicitud PRIME…',
+                  'Cargando el estado de tu solicitud PRIMEâ€¦',
                   style: TextStyle(color: Colors.white70),
                 ),
               ),
@@ -340,9 +409,10 @@ class _LeadStatusCard extends StatelessWidget {
 
     final copy = primeLeadCopyForStage(leadData.stage);
     final statusColor = primeLeadStatusColor(leadData.stage);
-    final updatedAt = leadData.updatedAt ?? leadData.submittedAt ?? leadData.createdAt;
+    final updatedAt =
+        leadData.updatedAt ?? leadData.submittedAt ?? leadData.createdAt;
     final formattedDate = updatedAt != null
-        ? DateFormat('dd MMM yyyy · HH:mm', 'es').format(updatedAt.toLocal())
+        ? DateFormat('dd MMM yyyy Â· HH:mm', 'es').format(updatedAt.toLocal())
         : null;
 
     return Card(
@@ -362,7 +432,9 @@ class _LeadStatusCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Actualizado $formattedDate',
-                      style: theme.textTheme.labelSmall?.copyWith(color: Colors.white54),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white54,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -446,7 +518,9 @@ class _StatusInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final badgeColor = stage != null ? primeLeadStatusColor(stage!) : Colors.white70;
+    final badgeColor = stage != null
+        ? primeLeadStatusColor(stage!)
+        : Colors.white70;
 
     return Card(
       color: const Color(0xFF111111),
@@ -534,7 +608,10 @@ class _PrimeLeadSuccessDialog extends StatelessWidget {
       backgroundColor: const Color(0xFF111111),
       title: Text(
         primeLeadSuccessTitle(stage),
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+        ),
       ),
       content: Text(
         copy.successMessage,
@@ -554,4 +631,3 @@ class _PrimeLeadSuccessDialog extends StatelessWidget {
     );
   }
 }
-

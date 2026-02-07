@@ -75,9 +75,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final user = FirebaseAuth.instance.currentUser;
 
     try {
-      await _controller.persist(user);
+      final savedUser = await _controller.persist(user);
+      if (savedUser != null) {
+        await savedUser.reload();
+      }
+      final refreshed = FirebaseAuth.instance.currentUser;
       if (!mounted) return;
-      context.go('/profile');
+      if (refreshed != null &&
+          !refreshed.isAnonymous &&
+          refreshed.email != null &&
+          !refreshed.emailVerified) {
+        context.go('/verify-email');
+      } else {
+        context.go('/profile');
+      }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       if (e.code == 'email-already-in-use' ||

@@ -10,9 +10,21 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function hasCoachAssignment(userUid, coachUid) {
+      return exists(
+        /databases/$(database)/documents/assignments/$(userUid)/coaches/$(coachUid)
+      );
+    }
+
     function isCoachFor(uid) {
-      return isSignedIn() &&
-        exists(/databases/$(database)/documents/assignments/$(uid)/coaches/$(request.auth.uid));
+      return isSignedIn() && hasCoachAssignment(uid, request.auth.uid);
+    }
+
+    function isAssignedPair(uid) {
+      return isSignedIn() && (
+        hasCoachAssignment(uid, request.auth.uid) ||
+        hasCoachAssignment(request.auth.uid, uid)
+      );
     }
 
     function getUserDoc(uid) {
@@ -26,7 +38,10 @@ service cloud.firestore {
 
     function roleVariants(role) {
       let coach = ['coach','Coach','COACH'];
-      let admin = ['admin','Admin','ADMIN'];
+      let admin = [
+        'admin','Admin','ADMIN',
+        'administrator','Administrator','ADMINISTRATOR'
+      ];
       let coloso = [
         'coloso_prime','coloso-prime','colosoprime','colosoPrime','coloso prime',
         'Coloso_prime','Coloso-prime','ColosoPrime','Coloso Prime',
@@ -40,18 +55,12 @@ service cloud.firestore {
     }
 
     function hasRole(userDoc, role) {
-      return userDoc.data != null && (
-        // Campo "role" como string
-        (userDoc.data.role is string &&
-          ( roleVariants(role).hasAny([userDoc.data.role]) ||
-            roleVariants(userDoc.data.role).hasAny([role]) )
-        )
-        ||
-        // Campo "roles" como lista
-        (userDoc.data.roles is list &&
-          userDoc.data.roles.hasAny(roleVariants(role))
-        )
-      );
+      return userDoc.data != null &&
+        userDoc.data.role is string &&
+        (
+          roleVariants(role).hasAny([userDoc.data.role]) ||
+          roleVariants(userDoc.data.role).hasAny([role])
+        );
     }
 
     function isAdmin() {
@@ -66,10 +75,37 @@ service cloud.firestore {
       return isSignedIn() && isCoachRole(getUserDoc(request.auth.uid));
     }
 
-    function isThreadMember(threadId) {
+    function isValidThreadMembers(members) {
+      return members is list &&
+        members.size() == 2 &&
+        members[0] is string &&
+        members[1] is string &&
+        members[0] != members[1];
+    }
+
+    function isChatPair(uidA, uidB) {
+      return isAdmin() ||
+        hasCoachAssignment(uidA, uidB) ||
+        hasCoachAssignment(uidB, uidA);
+    }
+
+    function canCreateThread(data) {
       return isSignedIn() &&
-        get(/databases/$(database)/documents/coach_threads/$(threadId))
-          .data.members.hasAny([request.auth.uid]);
+        data.keys().hasAll(['members']) &&
+        isValidThreadMembers(data.members) &&
+        data.members.hasAny([request.auth.uid]) &&
+        isChatPair(data.members[0], data.members[1]);
+    }
+
+    function memberListContains(data, uid) {
+      return data.members is list && data.members.hasAny([uid]);
+    }
+
+    function isThreadMember(threadId) {
+      let thread = get(/databases/$(database)/documents/coach_threads/$(threadId));
+      return isSignedIn() &&
+        thread.data != null &&
+        memberListContains(thread.data, request.auth.uid);
     }
 
     function noDietFields(data) {
@@ -78,13 +114,13 @@ service cloud.firestore {
 
     // ---------- MATCHES ----------
     match /users/{uid} {
-      allow read: if isOwner(uid) || isCoachFor(uid) || isAdmin();
+      allow read: if isOwner(uid) || isAssignedPair(uid) || isAdmin();
       allow write: if (isOwner(uid) || isAdmin()) &&
         noDietFields(request.resource.data);
     }
 
     match /profiles/{uid} {
-      allow read: if isOwner(uid) || isCoachFor(uid) || isAdmin();
+      allow read: if isOwner(uid) || isAssignedPair(uid) || isAdmin();
       allow write: if isOwner(uid) && noDietFields(request.resource.data);
     }
 
@@ -114,20 +150,22 @@ service cloud.firestore {
     }
 
     match /coach_threads/{threadId} {
-      allow get: if isSignedIn() && resource.data.members.hasAny([request.auth.uid]);
+      allow get: if isSignedIn() && memberListContains(resource.data, request.auth.uid);
       allow list: if false;
-      allow create: if isSignedIn() && request.resource.data.members.hasAny([request.auth.uid]);
+      allow create: if canCreateThread(request.resource.data);
       allow update: if isSignedIn() &&
-        resource.data.members.hasAny([request.auth.uid]) &&
-        request.resource.data.members.hasAny([request.auth.uid]);
+        (
+          (memberListContains(resource.data, request.auth.uid) &&
+            request.resource.data.members == resource.data.members) ||
+          canCreateThread(request.resource.data)
+        );
       allow delete: if false;
 
       match /messages/{messageId} {
         allow get, list: if isThreadMember(threadId);
         allow create: if isThreadMember(threadId) &&
           request.resource.data.fromUid == request.auth.uid;
-        allow update: if isThreadMember(threadId) &&
-          resource.data.fromUid == request.resource.data.fromUid;
+        allow update: if false;
         allow delete: if false;
       }
     }

@@ -43,10 +43,37 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         password: _passwordController.text.trim(),
       );
       final user = credential.user;
-      final userRepo = ref.read(userRepositoryProvider);
       if (user != null) {
-        await userRepo.ensureUserDocument(user, defaultRole: UserRole.coloso);
-        final profile = await userRepo.fetchProfile(user.uid);
+        await user.reload();
+      }
+      final refreshed = auth.currentUser;
+      if (refreshed != null &&
+          !refreshed.isAnonymous &&
+          refreshed.email != null &&
+          !refreshed.emailVerified) {
+        try {
+          await refreshed.sendEmailVerification();
+        } catch (_) {
+          // Ignore throttling/errors; user can resend from verification screen.
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Te enviamos un correo para verificar tu cuenta. Confirma y vuelve.',
+            ),
+          ),
+        );
+        context.go('/verify-email');
+        return;
+      }
+      final userRepo = ref.read(userRepositoryProvider);
+      if (refreshed != null) {
+        await userRepo.ensureUserDocument(
+          refreshed,
+          defaultRole: UserRole.coloso,
+        );
+        final profile = await userRepo.fetchProfile(refreshed.uid);
         final needsOnboarding = profile?.onboardingComplete != true;
         if (!mounted) return;
         context.go(needsOnboarding ? '/onboarding' : '/profile');

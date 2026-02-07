@@ -680,25 +680,14 @@ class _MemberTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(userProfileProvider(uid));
-    final displayName = profileAsync.when(
-      data: (profile) {
-        final rawName = profile?.displayName;
-        final name = rawName?.trim();
-        if (name != null && name.isNotEmpty) {
-          return name;
-        }
-        return _fallbackName(uid, fallbackPrefix);
-      },
-      loading: () => _fallbackName(uid, fallbackPrefix),
-      error: (_, __) => _fallbackName(uid, fallbackPrefix),
-    );
-
-    final subtitleText = profileAsync.when(
-      data: (_) => subtitle,
-      loading: () => 'Cargando informaciÃ³n...',
-      error: (_, __) =>
-          'No pudimos cargar los detalles, pero puedes abrir el chat.',
-    );
+    final rawName = profileAsync.asData?.value?.displayName;
+    final name = rawName?.trim();
+    final displayName = (name != null && name.isNotEmpty)
+        ? name
+        : _fallbackName(uid, fallbackPrefix);
+    final subtitleText = profileAsync.hasError
+        ? 'No pudimos cargar los detalles, pero puedes abrir el chat.'
+        : subtitle;
 
     return ListTile(
       leading: CircleAvatar(child: Icon(leadingIcon)),

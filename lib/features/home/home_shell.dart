@@ -23,14 +23,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final profileAsync = ref.watch(currentUserProfileProvider);
     profileAsync.when(
       data: (profile) {
-        _lastKnownRole = profile?.role ?? UserRole.coloso;
+        if (profile == null) {
+          return;
+        }
+        _lastKnownRole = profile.role;
         _hasResolvedRole = true;
       },
       loading: () {},
-      error: (_, __) {
-        _lastKnownRole = UserRole.coloso;
-        _hasResolvedRole = true;
-      },
+      error: (_, __) {},
     );
 
     final role = _lastKnownRole;

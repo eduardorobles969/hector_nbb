@@ -49,21 +49,20 @@ class ChatRepository {
   /// Crea/retorna el ID del hilo entre el usuario actual y `otherUid`
   Future<String> ensureThread(String otherUid) async {
     final tid = buildThreadId(myUid, otherUid);
+    final members = myUid.compareTo(otherUid) <= 0
+        ? <String>[myUid, otherUid]
+        : <String>[otherUid, myUid];
     final ref = _db.collection('coach_threads').doc(tid);
-    final snap = await ref.get();
-    if (!snap.exists) {
-      await ref.set({
-        'members': [myUid, otherUid],
-        'lastMessageAt': FieldValue.serverTimestamp(),
-        'lastMessagePreview': '',
-      });
-    }
+    await ref.set({'members': members}, SetOptions(merge: true));
     return tid;
   }
 
-  Stream<List<ChatMessage>> watchMessages(String otherUid, {int limit = 200}) {
-    final tid = buildThreadId(myUid, otherUid);
-    return _db
+  Stream<List<ChatMessage>> watchMessages(
+    String otherUid, {
+    int limit = 200,
+  }) async* {
+    final tid = await ensureThread(otherUid);
+    yield* _db
         .collection('coach_threads')
         .doc(tid)
         .collection('messages')
@@ -81,7 +80,7 @@ class ChatRepository {
         .collection('messages')
         .doc();
     final now = DateTime.now();
-    final preview = text.length > 64 ? '${text.substring(0, 64)}…' : text;
+    final preview = text.length > 64 ? '${text.substring(0, 64)}...' : text;
 
     await _db.runTransaction((tx) async {
       tx.set(msgRef, {

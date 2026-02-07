@@ -7,5 +7,5 @@ final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
 
 final authStateChangesProvider = StreamProvider<User?>((ref) {
   final auth = ref.watch(firebaseAuthProvider);
-  return auth.authStateChanges();
+  return auth.idTokenChanges();
 });

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import 'features/auth/auth_providers.dart';
 import 'features/auth/auth_screen.dart';
+import 'features/auth/email_verification_screen.dart';
 import 'features/coach_chat/coach_screen.dart';
 import 'features/community/community_screen.dart';
 import 'features/home/home_shell.dart';
@@ -48,11 +49,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: '/',
-    refreshListenable: GoRouterRefreshStream(auth.authStateChanges()),
+    refreshListenable: GoRouterRefreshStream(auth.idTokenChanges()),
     routes: [
       GoRoute(path: '/', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/welcome', builder: (_, __) => const WelcomeScreen()),
       GoRoute(path: '/auth', builder: (_, __) => const AuthScreen()),
+      GoRoute(
+        path: '/verify-email',
+        builder: (_, __) => const EmailVerificationScreen(),
+      ),
       GoRoute(
         path: '/onboarding',
         builder: (_, __) => const OnboardingScreen(),
@@ -85,6 +90,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isAuthRoute = state.uri.path == '/auth';
       final isWelcomeRoute = state.uri.path == '/welcome';
       final isOnboardingRoute = state.uri.path == '/onboarding';
+      final isVerifyRoute = state.uri.path == '/verify-email';
 
       if (authState.isLoading) {
         return null;
@@ -96,10 +102,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         if (isAuthRoute ||
             isSplashRoute ||
             isWelcomeRoute ||
-            isOnboardingRoute) {
+            isOnboardingRoute ||
+            isVerifyRoute) {
           return null;
         }
         return '/welcome';
+      }
+
+      if (!user.isAnonymous &&
+          user.email != null &&
+          !user.emailVerified &&
+          !isVerifyRoute) {
+        return '/verify-email';
+      }
+      if (isVerifyRoute &&
+          (user.isAnonymous || user.email == null || user.emailVerified)) {
+        return '/profile';
       }
 
       final shouldOnboard = needsOnboarding();

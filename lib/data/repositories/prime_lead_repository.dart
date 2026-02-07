@@ -1,11 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/prime_lead.dart';
+import '../models/user_role.dart';
 
 class PrimeLeadRepository {
   PrimeLeadRepository();
 
   final _db = FirebaseFirestore.instance;
+  static const _resubmissionAllowedStatuses = <String>{
+    '',
+    'rejected',
+    'cancelled',
+  };
 
   CollectionReference<Map<String, dynamic>> get _col =>
       _db.collection('prime_leads');
@@ -43,15 +49,16 @@ class PrimeLeadRepository {
       final existingData = leadSnap.exists
           ? leadSnap.data() ?? const <String, dynamic>{}
           : const <String, dynamic>{};
-      final existingStatus = (existingData['status'] ?? '') as String?;
-      final hasCustomStatus =
-          existingStatus != null &&
-          existingStatus.isNotEmpty &&
-          existingStatus != 'pending_coach_assignment';
+      final existingStatus = (existingData['status'] as String?) ?? '';
 
-      final nextStatus = hasCustomStatus
-          ? existingStatus!
-          : 'pending_coach_assignment';
+      if (leadSnap.exists &&
+          !_resubmissionAllowedStatuses.contains(existingStatus)) {
+        throw StateError(
+          'Tu solicitud PRIME ya fue enviada y sigue en proceso. Espera a que el administrador la revise y asigne tu coach.',
+        );
+      }
+
+      final nextStatus = 'pending_coach_assignment';
       resolvedStatus = nextStatus;
 
       final hadCreatedAt =
@@ -59,8 +66,7 @@ class PrimeLeadRepository {
           existingData['createdAt'] != null;
 
       final userSnap = await tx.get(userRef);
-      final roles = _resolvedRoles(userSnap.data(), add: 'coloso');
-      final primaryRole = _canonicalRole(roles);
+      final primaryRole = _roleForRegularUser(userSnap.data());
 
       tx.set(leadRef, {
         'uid': uid,
@@ -78,7 +84,6 @@ class PrimeLeadRepository {
 
       tx.set(userRef, {
         'role': primaryRole,
-        'roles': roles.toList(),
         'primeStatus': nextStatus,
         'primeIntentAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -99,8 +104,7 @@ class PrimeLeadRepository {
       }
       final userSnap = await tx.get(userRef);
 
-      final roles = _resolvedRoles(userSnap.data(), add: 'coloso_prime');
-      final primaryRole = _canonicalRole(roles, fallback: 'coloso_prime');
+      final primaryRole = _roleForPrimeUser(userSnap.data());
 
       tx.set(leadRef, {
         'status': 'pending_coach_assignment',
@@ -110,7 +114,6 @@ class PrimeLeadRepository {
 
       tx.set(userRef, {
         'role': primaryRole,
-        'roles': roles.toList(),
         'primeStatus': 'pending_coach_assignment',
         'primeActivatedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -158,24 +161,19 @@ class PrimeLeadRepository {
         'status': 'active',
       }, SetOptions(merge: true));
 
-      final roles = _resolvedRoles(userSnap.data(), add: 'coloso_prime');
-      roles.add('coloso');
-      final primaryRole = _canonicalRole(roles, fallback: 'coloso_prime');
+      final primaryRole = _roleForPrimeUser(userSnap.data());
 
       tx.set(userRef, {
         'role': primaryRole,
-        'roles': roles.toList(),
         'primeStatus': 'coach_assigned',
         'primeActivatedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      final coachRoles = _resolvedRoles(coachSnap.data(), add: 'coach');
-      final coachPrimaryRole = _canonicalRole(coachRoles, fallback: 'coach');
+      final coachPrimaryRole = _roleForCoachUser(coachSnap.data());
 
       tx.set(coachRef, {
         'role': coachPrimaryRole,
-        'roles': coachRoles.toList(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     });
@@ -199,13 +197,10 @@ class PrimeLeadRepository {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      final roles = _resolvedRoles(userSnap.data(), remove: 'coloso_prime');
-      roles.add('coloso');
-      final primaryRole = _canonicalRole(roles);
+      final primaryRole = _roleForRegularUser(userSnap.data());
 
       tx.set(userRef, {
         'role': primaryRole,
-        'roles': roles.toList(),
         'primeStatus': 'rejected',
         'primeActivatedAt': FieldValue.delete(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -213,37 +208,36 @@ class PrimeLeadRepository {
     });
   }
 
-  Set<String> _resolvedRoles(
-    Map<String, dynamic>? data, {
-    String? add,
-    String? remove,
-  }) {
-    final roles = <String>{};
-    final rolesField = data?['roles'];
-    if (rolesField is Iterable) {
-      for (final value in rolesField) {
-        if (value is String && value.isNotEmpty) {
-          roles.add(value.trim().toLowerCase());
-        }
-      }
+  String _normalizedRoleFromData(Map<String, dynamic>? data) {
+    final rawRole = (data?['role'] as String?)?.trim();
+    if (rawRole != null && rawRole.isNotEmpty) {
+      return UserRoleX.fromId(rawRole).id;
     }
-    final singleRole = (data?['role'] as String?)?.trim().toLowerCase();
-    if (singleRole != null && singleRole.isNotEmpty) {
-      roles.add(singleRole);
-    }
-    if (remove != null && remove.isNotEmpty) {
-      roles.remove(remove);
-    }
-    if (add != null && add.isNotEmpty) {
-      roles.add(add);
-    }
-    return roles;
+
+    return UserRole.coloso.id;
   }
 
-  String _canonicalRole(Set<String> roles, {String fallback = 'coloso'}) {
-    if (roles.contains('admin')) return 'admin';
-    if (roles.contains('coloso_prime')) return 'coloso_prime';
-    if (roles.contains('coach')) return 'coach';
-    return fallback;
+  String _roleForPrimeUser(Map<String, dynamic>? data) {
+    final currentRole = _normalizedRoleFromData(data);
+    if (currentRole == UserRole.admin.id || currentRole == UserRole.coach.id) {
+      return currentRole;
+    }
+    return UserRole.colosoPrime.id;
+  }
+
+  String _roleForRegularUser(Map<String, dynamic>? data) {
+    final currentRole = _normalizedRoleFromData(data);
+    if (currentRole == UserRole.admin.id || currentRole == UserRole.coach.id) {
+      return currentRole;
+    }
+    return UserRole.coloso.id;
+  }
+
+  String _roleForCoachUser(Map<String, dynamic>? data) {
+    final currentRole = _normalizedRoleFromData(data);
+    if (currentRole == UserRole.admin.id || currentRole == UserRole.coach.id) {
+      return currentRole;
+    }
+    return UserRole.coach.id;
   }
 }

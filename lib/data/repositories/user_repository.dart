@@ -51,16 +51,10 @@ class UserRepository {
 
     final existingData = snap.data();
 
-    final initialRoles = <String>{effectiveRoleId};
-    if (forcedRole == UserRole.admin) {
-      initialRoles.add('coach');
-    }
-
     if (!snap.exists) {
       await ref.set({
         ...baseData,
         'role': effectiveRoleId,
-        'roles': initialRoles.toList(),
         'createdAt': FieldValue.serverTimestamp(),
         'onboardingComplete': false,
         'goals': <String>[],
@@ -69,24 +63,13 @@ class UserRepository {
       return;
     }
 
-    var storedRoleId = (existingData?['role'] as String?)?.trim().toLowerCase();
-    if (storedRoleId == null || storedRoleId.isEmpty) {
-      storedRoleId = effectiveRoleId;
-    }
+    var storedRoleId = _resolvedStoredRole(
+      existingData,
+      fallback: effectiveRoleId,
+    );
     if (forcedRole != null) {
       storedRoleId = forcedRole.id;
     }
-
-    final rolesField = existingData?['roles'];
-    final storedRoles = <String>{};
-    if (rolesField is Iterable) {
-      for (final value in rolesField) {
-        if (value is String && value.isNotEmpty) {
-          storedRoles.add(value.trim().toLowerCase());
-        }
-      }
-    }
-    storedRoles.addAll(initialRoles);
 
     final goalsField = existingData?['goals'];
     final goalsList = goalsField is Iterable
@@ -101,7 +84,6 @@ class UserRepository {
     await ref.set({
       ...baseData,
       'role': storedRoleId,
-      'roles': storedRoles.toList(),
       'createdAt': existingData?['createdAt'] ?? FieldValue.serverTimestamp(),
       'onboardingComplete': existingData?['onboardingComplete'] ?? false,
       'goals': goalsList,
@@ -120,9 +102,20 @@ class UserRepository {
   Future<void> updateRole(String uid, UserRole role) async {
     await _col.doc(uid).update({
       'role': role.id,
-      'roles': FieldValue.arrayUnion([role.id]),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  String _resolvedStoredRole(
+    Map<String, dynamic>? data, {
+    required String fallback,
+  }) {
+    final rawRole = (data?['role'] as String?)?.trim();
+    if (rawRole != null && rawRole.isNotEmpty) {
+      return UserRoleX.fromId(rawRole).id;
+    }
+
+    return fallback;
   }
 
   Future<void> saveOnboardingIntake(

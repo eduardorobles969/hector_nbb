@@ -81,67 +81,16 @@ class UserProfile {
   }
 
   static String _primaryRoleFromData(Map<String, dynamic> data) {
-    final rawRole = (data['role'] as String?)?.trim().toLowerCase();
-    final normalizedRoles = _normalizedRoles(data['roles']);
-
-    if (_isCoach(rawRole, normalizedRoles)) {
-      return 'coach';
-    }
-
-    if (_isAdmin(rawRole, normalizedRoles)) {
-      return 'admin';
-    }
-
-    if (_isPrime(rawRole, normalizedRoles, data['primeStatus'])) {
-      return 'coloso_prime';
-    }
-
+    final rawRole = (data['role'] as String?)?.trim();
     if (rawRole != null && rawRole.isNotEmpty) {
-      return rawRole;
+      return UserRoleX.fromId(rawRole).id;
     }
 
-    return 'coloso';
-  }
+    final primeStatus = (data['primeStatus'] as String?)?.trim();
+    if (primeStatus != null && primeStatus.isNotEmpty) {
+      return UserRole.colosoPrime.id;
+    }
 
-  static Set<String> _normalizedRoles(dynamic rolesField) {
-    if (rolesField is Iterable) {
-      return rolesField
-          .whereType<String>()
-          .map((role) => role.trim().toLowerCase())
-          .where((role) => role.isNotEmpty)
-          .toSet();
-    }
-    return <String>{};
-  }
-
-  static bool _isCoach(String? rawRole, Set<String> normalizedRoles) {
-    return rawRole == 'coach' || normalizedRoles.contains('coach');
-  }
-
-  static bool _isPrime(
-    String? rawRole,
-    Set<String> normalizedRoles,
-    dynamic primeStatusField,
-  ) {
-    if (rawRole == 'coloso_prime') {
-      return true;
-    }
-    if (normalizedRoles.contains('coloso_prime') ||
-        normalizedRoles.contains('colosoprime') ||
-        normalizedRoles.contains('coloso-prime')) {
-      return true;
-    }
-    if (primeStatusField is String && primeStatusField.isNotEmpty) {
-      return true;
-    }
-    return false;
-  }
-
-  static bool _isAdmin(String? rawRole, Set<String> normalizedRoles) {
-    if (rawRole == 'admin') {
-      return true;
-    }
-    return normalizedRoles.contains('admin') ||
-        normalizedRoles.contains('administrator');
+    return UserRole.coloso.id;
   }
 }
